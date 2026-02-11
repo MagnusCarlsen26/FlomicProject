@@ -56,6 +56,19 @@ export async function getCurrentUser() {
   }
 }
 
+export async function loginWithGoogleToken(idToken) {
+  if (!idToken) {
+    throw new Error('Google ID token is required')
+  }
+
+  const data = await apiFetch('/api/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
+  })
+
+  return data?.user ?? data ?? null
+}
+
 export async function logoutSession() {
   try {
     await apiFetch('/api/auth/logout', { method: 'POST' })
