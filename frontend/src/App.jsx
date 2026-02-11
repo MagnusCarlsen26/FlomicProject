@@ -50,7 +50,7 @@ export default function App() {
       <Route path="/" element={<RoleHomeRedirect />} />
       <Route path="/login" element={<LoginRoute />} />
 
-      <Route element={<ProtectedRoute allowedRoles={['salesman']} />}>
+      <Route element={<ProtectedRoute allowedRoles={['salesman', 'admin']} />}>
         <Route path="/salesman" element={<SalesmanPage />} />
       </Route>
 

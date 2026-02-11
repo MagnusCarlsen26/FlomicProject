@@ -1,45 +1,48 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `frontend/`: React + Vite client app. Main code is in `frontend/src/` (`App.jsx`, `main.jsx`, `index.css`), with build/config files at the folder root (`vite.config.js`, `tailwind.config.js`, `eslint.config.js`).
-- `backend/`: Express API server entrypoint is `backend/index.js`; environment examples live in `backend/.env.example`.
-- `Knowledge/`: static reference assets (images).
-- Avoid editing generated/dependency folders (`frontend/dist/`, `frontend/node_modules/`, `backend/node_modules/`).
+This repository is split into two apps:
+- `backend/`: Express + MongoDB API (entrypoint: `backend/index.js`), with route logic in `index.js`, auth middleware in `backend/middleware/`, data models in `backend/models/`, and shared helpers in `backend/utils/`.
+- `frontend/`: React + Vite client (entrypoint: `frontend/src/main.jsx`), with pages in `frontend/src/pages/`, reusable UI/auth guards in `frontend/src/components/`, auth state in `frontend/src/context/`, and HTTP helpers in `frontend/src/services/`.
+- `Knowledge/`: reference images used for context.
 
 ## Build, Test, and Development Commands
-- Frontend setup: `cd frontend && npm install`
-- Frontend dev server: `npm run dev` (Vite local server)
-- Frontend production build: `npm run build` (outputs to `frontend/dist/`)
-- Frontend lint: `npm run lint` (ESLint flat config)
-- Frontend preview build: `npm run preview`
-- Backend setup: `cd backend && npm install`
-- Backend dev server: `npm run dev` (nodemon auto-reload)
-- Backend start: `npm start` (plain Node runtime)
+Run commands from each app directory.
+- Backend:
+  - `npm install`: install API dependencies.
+  - `npm run dev`: start API with `nodemon` (default `http://localhost:5000`).
+  - `npm start`: run API with Node for production-like local checks.
+- Frontend:
+  - `npm install`: install UI dependencies.
+  - `npm run dev`: start Vite dev server (default `http://localhost:5173`).
+  - `npm run build`: create production bundle in `frontend/dist/`.
+  - `npm run preview`: serve the production build locally.
+  - `npm run lint`: run ESLint across frontend files.
 
 ## Coding Style & Naming Conventions
-- Follow existing file-local style:
-  - Frontend (`*.jsx`, `*.js`) currently uses ES modules and no semicolons.
-  - Backend (`index.js`) uses CommonJS with semicolons.
-- Use 2-space indentation and keep functions/components focused.
-- React components: `PascalCase` (`App.jsx`); variables/functions/hooks: `camelCase`; env vars: `UPPER_SNAKE_CASE`.
-- Run `cd frontend && npm run lint` before opening a PR.
+- Follow existing style per package:
+  - `backend/`: CommonJS (`require/module.exports`), semicolons, 2-space indent.
+  - `frontend/`: ESM + React function components, no semicolons, 2-space indent.
+- Naming:
+  - React components/pages: `PascalCase` files (example: `SalesmanPage.jsx`).
+  - Utilities/services/hooks: `camelCase` exports (example: `apiFetch`, `useAuth`).
+  - Keep model names singular and `PascalCase` (example: `User.js`).
 
 ## Testing Guidelines
-- Current state: no automated test suite is configured yet (`backend` test script intentionally fails placeholder).
-- For new tests, add framework-specific scripts in `package.json` and keep test files near code or under a `tests/` folder using `*.test.js` / `*.test.jsx` naming.
-- In PRs, include manual verification steps for:
-  - `GET /health` and `GET /api/health`
-  - Frontend API connectivity from `frontend/src/App.jsx`
+Automated tests are not configured yet (`backend` test script is a placeholder). For new features:
+- Add frontend tests near source as `*.test.jsx` or under `frontend/src/__tests__/`.
+- Add backend tests as `*.test.js` under `backend/` (for routes, auth, and model validation).
+- At minimum, run `frontend/npm run lint`, `frontend/npm run build`, and a manual API + UI smoke test before opening a PR.
 
 ## Commit & Pull Request Guidelines
-- Git history is minimal (`init project`), so use clear, imperative commit subjects (example: `Add backend health response details`).
-- Keep commits scoped to one concern.
+- Current history is short (`init project`, `feat: phase 1`, `phase 2`); use clear, imperative messages and prefer Conventional Commit prefixes (for example, `feat: add admin status filters`, `fix: validate planning rows`).
 - PRs should include:
-  - Purpose and summary of changes
-  - Commands run (lint/build/dev checks)
-  - Screenshots for UI changes
-  - Linked issue/task when applicable
+  - What changed and why.
+  - Any environment or schema changes.
+  - Screenshots/GIFs for UI changes (`/login`, `/salesman`, `/admin` flows).
+  - Linked issue/task ID when available.
 
 ## Security & Configuration Tips
-- Do not commit secrets; create local `backend/.env` from `backend/.env.example`.
-- Review `frontend/vite.config.js` proxy target before local integration testing (it currently points to a deployed backend URL).
+- Copy `.env.example` in both `backend/` and `frontend/` to local `.env`.
+- Never commit `.env` or secrets (`JWT_SECRET`, OAuth credentials, DB URI).
+- Keep `CORS_ORIGIN` and cookie settings aligned between local and deployed environments.

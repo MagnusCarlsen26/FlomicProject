@@ -6,8 +6,18 @@ const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
 const User = require('./models/User');
-const { requireAuth } = require('./middleware/auth');
+const WeeklyReport = require('./models/WeeklyReport');
+const StatusUpdate = require('./models/StatusUpdate');
+const { requireAuth, requireRole } = require('./middleware/auth');
 const { clearSessionCookie, setSessionCookie } = require('./utils/session');
+const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
+const {
+  buildDefaultActualOutputRows,
+  buildDefaultPlanningRows,
+  ensureWeekRows,
+  normalizeActualOutputRows,
+  normalizePlanningRows,
+} = require('./utils/weeklyReportRows');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +61,58 @@ function buildSafeUser(user) {
 
 function hasDbConnection() {
   return mongoose.connection?.readyState === 1;
+}
+
+async function getOrCreateCurrentWeekReport(salesmanId) {
+  const week = getWeekParts();
+  let report = await WeeklyReport.findOne({ salesmanId, weekKey: week.key });
+
+  if (!report) {
+    report = await WeeklyReport.create({
+      salesmanId,
+      weekKey: week.key,
+      weekStartDateUtc: week.weekStartDateUtc,
+      weekEndDateUtc: week.weekEndDateUtc,
+      planningRows: buildDefaultPlanningRows(week),
+      actualOutputRows: buildDefaultActualOutputRows(week),
+      currentStatus: 'not_started',
+      statusNote: '',
+    });
+
+    return { report, week };
+  }
+
+  const rowsChanged = ensureWeekRows(report, week);
+  if (rowsChanged) {
+    await report.save();
+  }
+
+  return { report, week };
+}
+
+function buildSalesmanWeekResponse(report, week) {
+  return {
+    week: {
+      key: week.key,
+      startDate: week.startDate,
+      endDate: week.endDate,
+      timezone: week.timezone,
+      isEditable: true,
+    },
+    planning: {
+      rows: report.planningRows || [],
+      submittedAt: report.planningSubmittedAt || null,
+    },
+    actualOutput: {
+      rows: report.actualOutputRows || [],
+      updatedAt: report.actualOutputUpdatedAt || null,
+    },
+    status: {
+      value: report.currentStatus || 'not_started',
+      note: report.statusNote || '',
+      updatedAt: report.statusUpdatedAt || null,
+    },
+  };
 }
 
 async function findOrCreateGoogleUser(payload) {
@@ -197,6 +259,247 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   clearSessionCookie(res);
   res.status(200).json({ status: 'OK' });
+});
+
+app.get('/api/salesman/current-week', requireAuth, requireRole('salesman', 'admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  try {
+    const { report, week } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    return res.status(200).json(buildSalesmanWeekResponse(report, week));
+  } catch (error) {
+    console.error('Current week fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch current week data' });
+  }
+});
+
+app.put('/api/salesman/planning', requireAuth, requireRole('salesman', 'admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const { weekKey, rows, submitted } = req.body || {};
+  const currentWeek = getWeekParts();
+
+  if (weekKey && weekKey !== currentWeek.key) {
+    return res.status(403).json({
+      message: `Editing is only allowed for current IST week (${currentWeek.key})`,
+    });
+  }
+
+  const normalizedResult = normalizePlanningRows(rows, currentWeek);
+  if (normalizedResult.error) {
+    return res.status(400).json({ message: normalizedResult.error });
+  }
+
+  try {
+    const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    report.planningRows = normalizedResult.rows;
+
+    if (submitted === true) {
+      report.planningSubmittedAt = new Date();
+    }
+
+    await report.save();
+
+    return res.status(200).json({
+      planning: {
+        rows: report.planningRows,
+        submittedAt: report.planningSubmittedAt || null,
+      },
+    });
+  } catch (error) {
+    console.error('Planning update error:', error);
+    return res.status(500).json({ message: 'Unable to update planning rows' });
+  }
+});
+
+app.put('/api/salesman/actual-output', requireAuth, requireRole('salesman', 'admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const { weekKey, rows } = req.body || {};
+  const currentWeek = getWeekParts();
+
+  if (weekKey && weekKey !== currentWeek.key) {
+    return res.status(403).json({
+      message: `Editing is only allowed for current IST week (${currentWeek.key})`,
+    });
+  }
+
+  const normalizedResult = normalizeActualOutputRows(rows, currentWeek);
+  if (normalizedResult.error) {
+    return res.status(400).json({ message: normalizedResult.error });
+  }
+
+  try {
+    const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    report.actualOutputRows = normalizedResult.rows;
+    report.actualOutputUpdatedAt = new Date();
+    await report.save();
+
+    return res.status(200).json({
+      actualOutput: {
+        rows: report.actualOutputRows,
+        updatedAt: report.actualOutputUpdatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Actual output update error:', error);
+    return res.status(500).json({ message: 'Unable to update actual output rows' });
+  }
+});
+
+app.put('/api/salesman/current-status', requireAuth, requireRole('salesman', 'admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const { weekKey, status, note } = req.body || {};
+  const allowedStatuses = ['not_started', 'in_progress', 'blocked', 'completed'];
+  const currentWeek = getWeekParts();
+
+  if (weekKey && weekKey !== currentWeek.key) {
+    return res.status(403).json({
+      message: `Editing is only allowed for current IST week (${currentWeek.key})`,
+    });
+  }
+
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      message: 'Invalid status. Allowed values: not_started, in_progress, blocked, completed',
+    });
+  }
+
+  const statusNote = String(note || '').trim().slice(0, 1000);
+
+  try {
+    const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    report.currentStatus = status;
+    report.statusNote = statusNote;
+    report.statusUpdatedAt = new Date();
+    await report.save();
+
+    await StatusUpdate.create({
+      salesmanId: req.auth.userId,
+      weekKey: currentWeek.key,
+      status,
+      note: statusNote,
+    });
+
+    return res.status(200).json({
+      status: {
+        value: report.currentStatus,
+        note: report.statusNote,
+        updatedAt: report.statusUpdatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Current status update error:', error);
+    return res.status(500).json({ message: 'Unable to update current status' });
+  }
+});
+
+app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const q = String(req.query?.q || '').trim();
+  const week = resolveWeekFromQuery(req.query?.week);
+
+  if (!week) {
+    return res.status(400).json({
+      message: 'Invalid week query. Use YYYY-Www (example: 2026-W07) or YYYY-MM-DD',
+    });
+  }
+
+  const salesmanQuery = { role: { $in: ['salesman', 'admin'] } };
+
+  if (q) {
+    const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQ, 'i');
+    salesmanQuery.$or = [{ name: regex }, { email: regex }];
+  }
+
+  try {
+    const salesmen = await User.find(salesmanQuery)
+      .select('_id name email picture role')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    if (salesmen.length === 0) {
+      return res.status(200).json({
+        week: {
+          key: week.key,
+          startDate: week.startDate,
+          endDate: week.endDate,
+          isoWeek: week.isoWeek,
+          timezone: week.timezone,
+        },
+        filters: {
+          q,
+        },
+        total: 0,
+        entries: [],
+      });
+    }
+
+    const salesmanIds = salesmen.map((salesman) => salesman._id);
+    const reports = await WeeklyReport.find({
+      salesmanId: { $in: salesmanIds },
+      weekKey: week.key,
+    }).lean();
+
+    const reportBySalesmanId = new Map(
+      reports.map((report) => [String(report.salesmanId), report])
+    );
+
+    const entries = salesmen
+      .map((salesman) => {
+        const report = reportBySalesmanId.get(String(salesman._id));
+
+        return {
+          salesman: {
+            id: String(salesman._id),
+            name: salesman.name || '',
+            email: salesman.email,
+            picture: salesman.picture || '',
+            role: salesman.role,
+          },
+          planning: {
+            rows: report?.planningRows || [],
+            submittedAt: report?.planningSubmittedAt || null,
+          },
+          actualOutput: {
+            rows: report?.actualOutputRows || [],
+            updatedAt: report?.actualOutputUpdatedAt || null,
+          },
+          hasData: Boolean(report),
+        };
+      });
+
+    return res.status(200).json({
+      week: {
+        key: week.key,
+        startDate: week.startDate,
+        endDate: week.endDate,
+        isoWeek: week.isoWeek,
+        timezone: week.timezone,
+      },
+      filters: {
+        q,
+      },
+      total: entries.length,
+      entries,
+    });
+  } catch (error) {
+    console.error('Admin salesmen status fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch admin dashboard data' });
+  }
 });
 
 app.listen(PORT, () => {

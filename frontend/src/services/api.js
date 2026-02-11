@@ -7,6 +7,8 @@ class ApiError extends Error {
   }
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000
+
 async function parseResponseBody(response) {
   const contentType = response.headers.get('content-type') || ''
 
@@ -24,11 +26,46 @@ export async function apiFetch(path, options = {}) {
     ...options.headers,
   }
 
-  const response = await fetch(path, {
-    ...options,
-    headers,
-    credentials: 'include',
-  })
+  const timeoutMs =
+    Number.isFinite(Number(options.timeoutMs)) && Number(options.timeoutMs) > 0
+      ? Number(options.timeoutMs)
+      : DEFAULT_REQUEST_TIMEOUT_MS
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  let unsubscribeAbortListener = null
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort()
+    } else {
+      const onAbort = () => controller.abort()
+      options.signal.addEventListener('abort', onAbort, { once: true })
+      unsubscribeAbortListener = () => options.signal.removeEventListener('abort', onAbort)
+    }
+  }
+
+  let response
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('Request timed out. Please retry.', 408, null)
+    }
+
+    throw new ApiError('Network request failed. Check connection and retry.', 0, null)
+  } finally {
+    clearTimeout(timeoutId)
+    if (unsubscribeAbortListener) {
+      unsubscribeAbortListener()
+    }
+  }
 
   const data = await parseResponseBody(response)
 
@@ -78,6 +115,46 @@ export async function logoutSession() {
     }
     throw error
   }
+}
+
+export async function getSalesmanCurrentWeek() {
+  return apiFetch('/api/salesman/current-week')
+}
+
+export async function updateSalesmanPlanning({ weekKey, rows, submitted = false }) {
+  return apiFetch('/api/salesman/planning', {
+    method: 'PUT',
+    body: JSON.stringify({ weekKey, rows, submitted }),
+  })
+}
+
+export async function updateSalesmanActualOutput({ weekKey, rows }) {
+  return apiFetch('/api/salesman/actual-output', {
+    method: 'PUT',
+    body: JSON.stringify({ weekKey, rows }),
+  })
+}
+
+export async function updateSalesmanCurrentStatus({ weekKey, status, note }) {
+  return apiFetch('/api/salesman/current-status', {
+    method: 'PUT',
+    body: JSON.stringify({ weekKey, status, note }),
+  })
+}
+
+export async function getAdminSalesmenStatus({ week, q } = {}) {
+  const params = new URLSearchParams()
+
+  if (week) {
+    params.set('week', week)
+  }
+
+  if (q) {
+    params.set('q', q)
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/salesmen-status${suffix}`)
 }
 
 export { ApiError }
