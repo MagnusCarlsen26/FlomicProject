@@ -1,38 +1,64 @@
-import { useState } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import ProtectedRoute from './components/ProtectedRoute'
+import { useAuth } from './context/useAuth'
+import AdminPage from './pages/AdminPage'
+import LoginPage from './pages/LoginPage'
+import SalesmanPage from './pages/SalesmanPage'
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-          React + Tailwind
-        </h1>
-        <p className="mt-2 text-slate-600">
-          Edit <code className="rounded bg-slate-100 px-1 py-0.5">src/App.jsx</code>{' '}
-          and save to test HMR.
-        </p>
-
-        <div className="mt-8 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setCount((c) => c + 1)}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
-          >
-            Count: {count}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCount(0)}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
-          >
-            Reset
-          </button>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+        <h1 className="text-lg font-semibold text-slate-900">Loading app</h1>
+        <p className="mt-2 text-sm text-slate-600">Checking authentication state...</p>
       </div>
     </div>
   )
 }
 
-export default App
+function RoleHomeRedirect() {
+  const { status, user } = useAuth()
+
+  if (status === 'loading') {
+    return <LoadingScreen />
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Navigate to={user.role === 'admin' ? '/admin' : '/salesman'} replace />
+}
+
+function LoginRoute() {
+  const { status, user } = useAuth()
+
+  if (status === 'loading') {
+    return <LoadingScreen />
+  }
+
+  if (user) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/salesman'} replace />
+  }
+
+  return <LoginPage />
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<RoleHomeRedirect />} />
+      <Route path="/login" element={<LoginRoute />} />
+
+      <Route element={<ProtectedRoute allowedRoles={['salesman']} />}>
+        <Route path="/salesman" element={<SalesmanPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+        <Route path="/admin" element={<AdminPage />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
