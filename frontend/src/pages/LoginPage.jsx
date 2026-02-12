@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import PageEnter from '../components/motion/PageEnter'
+import Alert from '../components/ui/Alert'
+import Button from '../components/ui/Button'
+import GlassCard from '../components/ui/GlassCard'
 import { useAuth } from '../context/useAuth'
+import { useTheme } from '../context/useTheme'
 import { ApiError, loginWithGoogleToken } from '../services/api'
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services'
@@ -21,6 +26,7 @@ function getErrorMessage(error) {
 export default function LoginPage() {
   const location = useLocation()
   const { error, refreshSession } = useAuth()
+  const { resolvedTheme } = useTheme()
   const fromPath = location.state?.from?.pathname
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -67,7 +73,7 @@ export default function LoginPage() {
 
     googleButtonRef.current.innerHTML = ''
     window.google.accounts.id.renderButton(googleButtonRef.current, {
-      theme: 'outline',
+      theme: resolvedTheme === 'dark' ? 'filled_black' : 'outline',
       size: 'large',
       text: 'continue_with',
       shape: 'pill',
@@ -75,7 +81,7 @@ export default function LoginPage() {
     })
 
     setGoogleReady(true)
-  }, [googleClientId, handleCredentialResponse])
+  }, [googleClientId, handleCredentialResponse, resolvedTheme])
 
   useEffect(() => {
     if (!googleClientId) {
@@ -131,52 +137,58 @@ export default function LoginPage() {
   }, [googleClientId, renderGoogleButton])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white px-4 py-12">
-      <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Flomic</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Use your Google account. New sign-ins are created as <span className="font-medium">salesman</span>
-          .
-        </p>
-
-        {fromPath && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            You need to sign in to access <span className="font-medium">{fromPath}</span>.
+    <div className="relative flex min-h-screen items-center px-4 py-8">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <PageEnter className="glass-card relative hidden overflow-hidden rounded-[2rem] p-9 lg:block">
+          <div className="absolute -right-16 -top-10 h-44 w-44 rounded-full bg-primary/30 blur-3xl" />
+          <div className="absolute -bottom-20 left-6 h-52 w-52 rounded-full bg-secondary/30 blur-3xl" />
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-text-secondary">Flomic Sales Command</p>
+          <h1 className="mt-5 max-w-md text-4xl font-bold text-text-primary">Weekly planning and performance in one workspace.</h1>
+          <p className="mt-4 max-w-lg text-base text-text-secondary">
+            Use your Google account to securely access your role dashboard. New sign-ins are provisioned as salesman by
+            default.
+          </p>
+          <div className="mt-10 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-surface/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-text-muted">Live sync</p>
+              <p className="mt-1 text-sm text-text-secondary">Admin dashboards refresh automatically while visible.</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-text-muted">Role aware</p>
+              <p className="mt-1 text-sm text-text-secondary">Routing remains tied to your authenticated role.</p>
+            </div>
           </div>
-        )}
+        </PageEnter>
 
-        {error && (
-          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-            Session check error: {error}
-          </div>
-        )}
+        <PageEnter>
+          <GlassCard className="mx-auto w-full max-w-lg rounded-[2rem] p-7 md:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Welcome</p>
+            <h2 className="mt-2 text-3xl font-bold text-text-primary">Sign in to continue</h2>
+            <p className="mt-2 text-sm text-text-secondary">Use your Google account and continue to your assigned workspace.</p>
 
-        {signInError && (
-          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-            {signInError}
-          </div>
-        )}
+            <div className="mt-5 space-y-3">
+              {fromPath ? (
+                <Alert tone="warning">You need to sign in to access <span className="font-semibold">{fromPath}</span>.</Alert>
+              ) : null}
+              {error ? <Alert tone="error">Session check error: {error}</Alert> : null}
+              {signInError ? <Alert tone="error">{signInError}</Alert> : null}
+            </div>
 
-        <div className="mt-6 flex justify-center">
-          <div ref={googleButtonRef} />
-        </div>
+            <div className="mt-6 flex min-h-[54px] justify-center">
+              <div ref={googleButtonRef} />
+            </div>
 
-        {!googleReady && googleClientId && (
-          <p className="mt-3 text-center text-sm text-slate-500">Loading Google sign-in...</p>
-        )}
+            {!googleReady && googleClientId ? (
+              <p className="mt-3 text-center text-sm text-text-secondary">Loading Google sign-in...</p>
+            ) : null}
 
-        {isSigningIn && (
-          <p className="mt-3 text-center text-sm text-slate-600">Completing sign-in...</p>
-        )}
+            {isSigningIn ? <p className="mt-3 text-center text-sm text-text-secondary">Completing sign-in...</p> : null}
 
-        <button
-          type="button"
-          onClick={refreshSession}
-          className="mt-6 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
-        >
-          Retry session check
-        </button>
+            <Button className="mt-6 w-full" variant="secondary" onClick={refreshSession}>
+              Retry session check
+            </Button>
+          </GlassCard>
+        </PageEnter>
       </div>
     </div>
   )

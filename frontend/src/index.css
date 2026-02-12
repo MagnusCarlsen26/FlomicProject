@@ -1,9 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-bg: 243 248 255;
+  --color-bg-alt: 229 238 251;
+  --color-surface: 255 255 255;
+  --color-surface-muted: 240 246 255;
+  --color-border: 188 202 221;
+  --color-border-strong: 149 170 199;
+  --color-text-primary: 16 29 48;
+  --color-text-secondary: 60 79 106;
+  --color-text-muted: 103 123 152;
+  --color-primary: 9 147 232;
+  --color-secondary: 245 161 66;
+  --color-success: 8 153 117;
+  --color-warning: 201 122 16;
+  --color-error: 203 48 79;
+  --color-info: 29 110 219;
+  --gradient-brand: linear-gradient(125deg, rgb(14 170 255), rgb(252 175 70));
+  --bg-radial: radial-gradient(circle at 20% 15%, rgb(152 224 255 / 40%), transparent 45%), radial-gradient(circle at 85% 20%, rgb(255 199 126 / 28%), transparent 35%), radial-gradient(circle at 50% 120%, rgb(107 154 255 / 26%), transparent 42%);
+}
+
+:root[data-theme='dark'] {
+  --color-bg: 12 19 33;
+  --color-bg-alt: 21 33 54;
+  --color-surface: 18 29 47;
+  --color-surface-muted: 26 40 63;
+  --color-border: 67 90 122;
+  --color-border-strong: 96 125 166;
+  --color-text-primary: 233 244 255;
+  --color-text-secondary: 191 211 236;
+  --color-text-muted: 145 172 205;
+  --color-primary: 63 190 255;
+  --color-secondary: 255 187 101;
+  --color-success: 63 216 176;
+  --color-warning: 250 185 89;
+  --color-error: 255 122 145;
+  --color-info: 117 169 255;
+  --gradient-brand: linear-gradient(130deg, rgb(29 191 255), rgb(255 183 87));
+  --bg-radial: radial-gradient(circle at 25% 5%, rgb(32 96 160 / 38%), transparent 45%), radial-gradient(circle at 90% 15%, rgb(163 101 45 / 20%), transparent 36%), radial-gradient(circle at 50% 100%, rgb(56 89 152 / 30%), transparent 45%);
+}
+
 @layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
-    @apply bg-white text-slate-900;
+    margin: 0;
+    font-family: 'Manrope', 'Segoe UI', sans-serif;
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text-primary));
+    background-image: var(--bg-radial), linear-gradient(180deg, rgb(var(--color-bg)), rgb(var(--color-bg-alt)) 65%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Sora', 'Manrope', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: color-mix(in srgb, rgb(var(--color-surface)) 78%, transparent);
+    border: 1px solid rgb(var(--color-border) / 0.8);
+    box-shadow: 0 18px 40px rgb(10 27 53 / 0.16);
+    backdrop-filter: blur(15px);
+  }
+
+  .app-shell {
+    position: relative;
+  }
+
+  .table-core thead {
+    background: color-mix(in srgb, rgb(var(--color-surface-muted)) 90%, transparent);
+  }
+
+  .table-core tbody tr {
+    border-top: 1px solid rgb(var(--color-border) / 0.8);
+  }
+
+  .table-core tbody tr:nth-child(even) {
+    background: color-mix(in srgb, rgb(var(--color-surface-muted)) 45%, transparent);
+  }
+
+  .table-core th {
+    color: rgb(var(--color-text-muted));
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+  }
+
+  .table-core td {
+    color: rgb(var(--color-text-primary));
+    font-size: 0.875rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .gradient-text {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }

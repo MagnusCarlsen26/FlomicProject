@@ -3,10 +3,10 @@ import { useAuth } from '../context/useAuth'
 
 function FullPageMessage({ title, subtitle }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-2 text-sm text-slate-600">{subtitle}</p>}
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="glass-card w-full max-w-md rounded-3xl p-6 text-center">
+        <h1 className="text-xl font-semibold text-text-primary">{title}</h1>
+        {subtitle ? <p className="mt-2 text-sm text-text-secondary">{subtitle}</p> : null}
       </div>
     </div>
   )

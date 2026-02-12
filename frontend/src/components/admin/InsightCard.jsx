@@ -1,9 +1,11 @@
+import GlassCard from '../ui/GlassCard'
+
 export default function InsightCard({ title, value, subtitle }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
-      {subtitle && <p className="mt-1 text-xs text-slate-600">{subtitle}</p>}
-    </div>
+    <GlassCard className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+      <p className="text-2xl font-bold text-text-primary">{value}</p>
+      {subtitle ? <p className="text-xs text-text-secondary">{subtitle}</p> : null}
+    </GlassCard>
   )
 }

@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom'
 
 function getTabClassName({ isActive }) {
-  const baseClass = 'rounded-lg px-3 py-2 text-sm font-medium transition'
+  const baseClass = 'rounded-xl px-3 py-2 text-sm font-semibold transition whitespace-nowrap'
   if (isActive) {
-    return `${baseClass} bg-slate-900 text-white`
+    return `${baseClass} bg-gradient-brand text-white shadow-glow`
   }
 
-  return `${baseClass} border border-slate-300 bg-white text-slate-800 hover:bg-slate-100`
+  return `${baseClass} border border-border bg-surface text-text-secondary hover:bg-surface-muted`
 }
 
 export default function AdminSectionTabs() {

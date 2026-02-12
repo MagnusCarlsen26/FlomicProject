@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from '../context/useAuth'
+import FilterBar from '../components/layout/FilterBar'
+import PageSurface from '../components/layout/PageSurface'
+import PageEnter from '../components/motion/PageEnter'
+import Alert from '../components/ui/Alert'
+import Badge from '../components/ui/Badge'
+import Button from '../components/ui/Button'
+import DataTableFrame from '../components/ui/DataTableFrame'
+import GlassCard from '../components/ui/GlassCard'
+import Input from '../components/ui/Input'
 import { getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
 import AdminSectionTabs from '../components/admin/AdminSectionTabs'
@@ -7,78 +15,77 @@ import { POLL_INTERVAL_MS, formatDateTime, formatSheetDate, getDefaultRangeWeeks
 
 function PlanningRowsTable({ rows }) {
   if (!rows?.length) {
-    return <p className="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-600">No rows</p>
+    return <p className="rounded-xl border border-dashed border-border p-3 text-sm text-text-secondary">No rows</p>
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+    <DataTableFrame>
+      <table className="table-core min-w-full text-sm">
+        <thead>
           <tr>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Week</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Date</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Customer</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Location</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Type</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Contact</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">If JSV, with whom</th>
+            <th>Week</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Location</th>
+            <th>Type</th>
+            <th>Contact</th>
+            <th>If JSV, with whom</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
+        <tbody>
           {rows.map((row, index) => (
             <tr key={`${row.date || 'planning'}-${index}`}>
-              <td className="px-3 py-2 text-slate-800">{row.isoWeek ?? '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{formatSheetDate(row.date)}</td>
-              <td className="px-3 py-2 text-slate-800">{row.customerName || '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{row.locationArea || '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{customerTypeLabel(row.customerType)}</td>
-              <td className="px-3 py-2 text-slate-800">{contactTypeLabel(row.contactType)}</td>
-              <td className="px-3 py-2 text-slate-700">{row.jsvWithWhom || '-'}</td>
+              <td>{row.isoWeek ?? '-'}</td>
+              <td>{formatSheetDate(row.date)}</td>
+              <td>{row.customerName || '-'}</td>
+              <td>{row.locationArea || '-'}</td>
+              <td>{customerTypeLabel(row.customerType)}</td>
+              <td>{contactTypeLabel(row.contactType)}</td>
+              <td>{row.jsvWithWhom || '-'}</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </DataTableFrame>
   )
 }
 
 function ActualOutputRowsTable({ rows }) {
   if (!rows?.length) {
-    return <p className="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-600">No rows</p>
+    return <p className="rounded-xl border border-dashed border-border p-3 text-sm text-text-secondary">No rows</p>
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+    <DataTableFrame>
+      <table className="table-core min-w-full text-sm">
+        <thead>
           <tr>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Week</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Date</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Visited</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Reason not visited</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Enquiries</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Shipments</th>
+            <th>Week</th>
+            <th>Date</th>
+            <th>Visited</th>
+            <th>Reason not visited</th>
+            <th>Enquiries</th>
+            <th>Shipments</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
+        <tbody>
           {rows.map((row, index) => (
             <tr key={`${row.date || 'actual'}-${index}`}>
-              <td className="px-3 py-2 text-slate-800">{row.isoWeek ?? '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{formatSheetDate(row.date)}</td>
-              <td className="px-3 py-2 text-slate-800">{visitedLabel(row.visited)}</td>
-              <td className="px-3 py-2 text-slate-700">{row.notVisitedReason || '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{row.enquiriesReceived ?? 0}</td>
-              <td className="px-3 py-2 text-slate-800">{row.shipmentsConverted ?? 0}</td>
+              <td>{row.isoWeek ?? '-'}</td>
+              <td>{formatSheetDate(row.date)}</td>
+              <td>{visitedLabel(row.visited)}</td>
+              <td>{row.notVisitedReason || '-'}</td>
+              <td>{row.enquiriesReceived ?? 0}</td>
+              <td>{row.shipmentsConverted ?? 0}</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </DataTableFrame>
   )
 }
 
 export default function AdminSalesmenStatusPage() {
-  const { user, signOut } = useAuth()
   const defaultRange = useMemo(() => getDefaultRangeWeeks(), [])
 
   const [loading, setLoading] = useState(true)
@@ -165,110 +172,83 @@ export default function AdminSalesmenStatusPage() {
   }, [fetchStatus])
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+    <PageEnter>
+      <PageSurface>
+        <GlassCard>
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Admin</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Salesman Status</h1>
-              <p className="mt-1 text-sm text-slate-600">Detailed planning and actual output by salesperson.</p>
-              <p className="mt-1 text-sm text-slate-600">
-                Signed in as {user?.name || user?.email || 'Unknown user'}
-              </p>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Admin</p>
+              <h1 className="mt-1 text-2xl font-bold text-text-primary">Salesmen Status</h1>
+              <p className="mt-1 text-sm text-text-secondary">Detailed planning and actual output by salesperson.</p>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => fetchStatus()}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
-                disabled={loading || isRefreshing}
-              >
-                {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
-              <button
-                type="button"
-                onClick={signOut}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
-              >
-                Logout
-              </button>
-            </div>
+            <Button variant="secondary" onClick={() => fetchStatus()} disabled={loading || isRefreshing}>
+              {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </div>
 
           <div className="mt-4">
             <AdminSectionTabs />
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <input
-              type="text"
-              placeholder="Search salesperson"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <input
-              type="week"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={week}
-              onChange={(event) => setWeek(event.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => fetchStatus()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-              disabled={loading || isRefreshing}
-            >
-              {loading ? 'Loading...' : 'Apply filters'}
-            </button>
+          <div className="mt-4">
+            <FilterBar className="md:grid-cols-3">
+              <Input
+                type="text"
+                placeholder="Search salesperson"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <Input type="week" value={week} onChange={(event) => setWeek(event.target.value)} />
+              <Button onClick={() => fetchStatus()} disabled={loading || isRefreshing}>
+                {loading ? 'Loading...' : 'Apply filters'}
+              </Button>
+            </FilterBar>
           </div>
 
-          <div className="mt-3 text-sm text-slate-600">
-            Showing {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}
+          <p className="mt-3 text-sm text-text-secondary">Showing {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}</p>
+
+          <div className="mt-4 space-y-3">
+            {error ? <Alert tone="error">{error}</Alert> : null}
+            {successMessage && !error ? <Alert tone="success">{successMessage}</Alert> : null}
           </div>
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-              {error}
-            </div>
-          )}
-
-          {successMessage && !error && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              {successMessage}
-            </div>
-          )}
-        </header>
+        </GlassCard>
 
         <section className="space-y-3">
-          {loading && <p className="text-sm text-slate-600">Loading status...</p>}
+          {loading ? <p className="text-sm text-text-secondary">Loading status...</p> : null}
 
-          {!loading && entries.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-              No salesmen found for the selected filters.
-            </div>
-          )}
+          {!loading && entries.length === 0 ? (
+            <GlassCard>
+              <p className="text-sm text-text-secondary">No salesmen found for the selected filters.</p>
+            </GlassCard>
+          ) : null}
 
           {entries.map((entry) => (
-            <details key={entry.salesman.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <details key={entry.salesman.id} className="glass-card rounded-3xl p-4 open:ring-1 open:ring-primary/40">
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold text-slate-900">{entry.salesman.name || entry.salesman.email}</p>
-                  <p className="text-sm text-slate-600">{entry.salesman.email}</p>
+                  <p className="text-base font-semibold text-text-primary">{entry.salesman.name || entry.salesman.email}</p>
+                  <p className="text-sm text-text-secondary">{entry.salesman.email}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone={entry.planning.submittedAt ? 'success' : 'warning'}>
+                    Planning {entry.planning.submittedAt ? 'submitted' : 'draft'}
+                  </Badge>
+                  <Badge tone={entry.actualOutput.updatedAt ? 'info' : 'neutral'}>
+                    Actual {entry.actualOutput.updatedAt ? 'updated' : 'pending'}
+                  </Badge>
                 </div>
               </summary>
 
               <div className="mt-4 grid gap-4 xl:grid-cols-1">
-                <div className="space-y-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Planning</h2>
-                  <p className="text-xs text-slate-500">Submitted: {formatDateTime(entry.planning.submittedAt)}</p>
+                <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Planning</h2>
+                  <p className="text-xs text-text-secondary">Submitted: {formatDateTime(entry.planning.submittedAt)}</p>
                   <PlanningRowsTable rows={entry.planning.rows} />
                 </div>
 
-                <div className="space-y-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Actual Output</h2>
-                  <p className="text-xs text-slate-500">Updated: {formatDateTime(entry.actualOutput.updatedAt)}</p>
+                <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Actual Output</h2>
+                  <p className="text-xs text-text-secondary">Updated: {formatDateTime(entry.actualOutput.updatedAt)}</p>
                   <ActualOutputRowsTable rows={entry.actualOutput.rows} />
                 </div>
               </div>
@@ -276,10 +256,10 @@ export default function AdminSalesmenStatusPage() {
           ))}
         </section>
 
-        {weekInfo && (
-          <p className="text-xs text-slate-500">Detail table week: {weekInfo.startDate} to {weekInfo.endDate}</p>
-        )}
-      </div>
-    </div>
+        {weekInfo ? (
+          <p className="text-xs text-text-muted">Detail table week: {weekInfo.startDate} to {weekInfo.endDate}</p>
+        ) : null}
+      </PageSurface>
+    </PageEnter>
   )
 }

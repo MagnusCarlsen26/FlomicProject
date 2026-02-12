@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import PageSurface from '../components/layout/PageSurface'
+import StatTile from '../components/layout/StatTile'
+import PageEnter from '../components/motion/PageEnter'
+import RevealCard from '../components/motion/RevealCard'
+import StaggerGroup from '../components/motion/StaggerGroup'
+import Alert from '../components/ui/Alert'
+import Button from '../components/ui/Button'
+import DataTableFrame from '../components/ui/DataTableFrame'
+import GlassCard from '../components/ui/GlassCard'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import { useAuth } from '../context/useAuth'
 import {
   ApiError,
@@ -68,13 +79,18 @@ function toNonNegativeInteger(value) {
   return parsed
 }
 
-function SectionCard({ title, description, children }) {
+function SectionCard({ title, description, actions, children }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+    <GlassCard>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-text-primary">{title}</h2>
+          <p className="mt-1 text-sm text-text-secondary">{description}</p>
+        </div>
+        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      </div>
       <div className="mt-4">{children}</div>
-    </section>
+    </GlassCard>
   )
 }
 
@@ -104,47 +120,44 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
   )
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+    <DataTableFrame>
+      <table className="table-core min-w-full text-sm">
+        <thead>
           <tr>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Week</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Date</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Customer Name</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Location / Area</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Targeted / Existing</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">NC / FC / SC / JSV</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">If JSV, with whom</th>
+            <th>Week</th>
+            <th>Date</th>
+            <th>Customer Name</th>
+            <th>Location / Area</th>
+            <th>Targeted / Existing</th>
+            <th>NC / FC / SC / JSV</th>
+            <th>If JSV, with whom</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
+        <tbody>
           {rows.map((row, index) => (
             <tr key={row.date || `planning-row-${index}`}>
-              <td className="px-3 py-2 text-slate-800">{row.isoWeek ?? '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{formatSheetDate(row.date)}</td>
-              <td className="px-3 py-2">
-                <input
+              <td>{row.isoWeek ?? '-'}</td>
+              <td>{formatSheetDate(row.date)}</td>
+              <td>
+                <Input
                   type="text"
                   value={row.customerName || ''}
                   onChange={(event) => updateRow(index, 'customerName', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 />
               </td>
-              <td className="px-3 py-2">
-                <input
+              <td>
+                <Input
                   type="text"
                   value={row.locationArea || ''}
                   onChange={(event) => updateRow(index, 'locationArea', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 />
               </td>
-              <td className="px-3 py-2">
-                <select
+              <td>
+                <Select
                   value={row.customerType || ''}
                   onChange={(event) => updateRow(index, 'customerType', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 >
                   {CUSTOMER_TYPE_OPTIONS.map((option) => (
@@ -152,13 +165,12 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
-              <td className="px-3 py-2">
-                <select
+              <td>
+                <Select
                   value={row.contactType || ''}
                   onChange={(event) => updateRow(index, 'contactType', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 >
                   {CONTACT_TYPE_OPTIONS.map((option) => (
@@ -166,14 +178,13 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
-              <td className="px-3 py-2">
-                <input
+              <td>
+                <Input
                   type="text"
                   value={row.jsvWithWhom || ''}
                   onChange={(event) => updateRow(index, 'jsvWithWhom', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled || row.contactType !== 'jsv'}
                 />
               </td>
@@ -181,7 +192,7 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </DataTableFrame>
   )
 }
 
@@ -215,28 +226,27 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
   )
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+    <DataTableFrame>
+      <table className="table-core min-w-full text-sm">
+        <thead>
           <tr>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Week</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Date</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Visited</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Reason not visited</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Enquiries</th>
-            <th className="px-3 py-2 text-left font-medium text-slate-600">Shipments Converted</th>
+            <th>Week</th>
+            <th>Date</th>
+            <th>Visited</th>
+            <th>Reason not visited</th>
+            <th>Enquiries</th>
+            <th>Shipments Converted</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
+        <tbody>
           {rows.map((row, index) => (
             <tr key={row.date || `actual-row-${index}`}>
-              <td className="px-3 py-2 text-slate-800">{row.isoWeek ?? '-'}</td>
-              <td className="px-3 py-2 text-slate-800">{formatSheetDate(row.date)}</td>
-              <td className="px-3 py-2">
-                <select
+              <td>{row.isoWeek ?? '-'}</td>
+              <td>{formatSheetDate(row.date)}</td>
+              <td>
+                <Select
                   value={row.visited || ''}
                   onChange={(event) => updateRow(index, 'visited', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 >
                   {VISITED_OPTIONS.map((option) => (
@@ -244,34 +254,31 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
-              <td className="px-3 py-2">
-                <input
+              <td>
+                <Input
                   type="text"
                   value={row.notVisitedReason || ''}
                   onChange={(event) => updateRow(index, 'notVisitedReason', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled || row.visited !== 'no'}
                 />
               </td>
-              <td className="px-3 py-2">
-                <input
+              <td>
+                <Input
                   type="number"
                   min="0"
                   value={row.enquiriesReceived ?? 0}
                   onChange={(event) => updateRow(index, 'enquiriesReceived', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 />
               </td>
-              <td className="px-3 py-2">
-                <input
+              <td>
+                <Input
                   type="number"
                   min="0"
                   value={row.shipmentsConverted ?? 0}
                   onChange={(event) => updateRow(index, 'shipmentsConverted', event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   disabled={disabled}
                 />
               </td>
@@ -279,12 +286,12 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </DataTableFrame>
   )
 }
 
 export default function SalesmanPage() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -401,105 +408,80 @@ export default function SalesmanPage() {
   }, [actualRows, week?.key])
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+    <PageEnter>
+      <PageSurface>
+        <GlassCard className="overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Salesman</p>
-              <h1 className="text-2xl font-semibold text-slate-900">{pageTitle}</h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Signed in as {user?.name || user?.email || 'Unknown user'}
-              </p>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Salesman</p>
+              <h1 className="mt-1 text-2xl font-bold text-text-primary">{pageTitle}</h1>
+              <p className="mt-2 text-sm text-text-secondary">Signed in as {user?.name || user?.email || 'Unknown user'}</p>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={loadCurrentWeek}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
-                disabled={loading}
-              >
-                Refresh
-              </button>
-              <button
-                type="button"
-                onClick={signOut}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
-              >
-                Logout
-              </button>
-            </div>
+            <Button variant="secondary" onClick={loadCurrentWeek} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </div>
-          {!isEditable && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Editing is locked because the IST week has ended.
-            </div>
-          )}
-          {error && (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-              {error}
-            </div>
-          )}
-          {successMessage && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              {successMessage}
-            </div>
-          )}
-        </header>
+
+          <StaggerGroup className="mt-5 grid gap-3 md:grid-cols-3">
+            <RevealCard>
+              <StatTile
+                label="Week Range"
+                value={week ? `${week.startDate} to ${week.endDate}` : 'Pending'}
+                detail={week?.timezone || 'Timezone pending'}
+              />
+            </RevealCard>
+            <RevealCard>
+              <StatTile label="Planning Status" value={planningSubmittedAt ? 'Submitted' : 'Draft'} detail={formatDateTime(planningSubmittedAt)} />
+            </RevealCard>
+            <RevealCard>
+              <StatTile label="Actual Output" value={actualUpdatedAt ? 'Updated' : 'Not updated'} detail={formatDateTime(actualUpdatedAt)} />
+            </RevealCard>
+          </StaggerGroup>
+
+          <div className="mt-5 space-y-3">
+            {!isEditable ? <Alert tone="warning">Editing is locked because the IST week has ended.</Alert> : null}
+            {error ? <Alert tone="error">{error}</Alert> : null}
+            {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
+          </div>
+        </GlassCard>
 
         <SectionCard
           title="Planning"
           description={`Build your weekly plan. Last submitted: ${formatDateTime(planningSubmittedAt)}`}
+          actions={
+            <>
+              <Button variant="secondary" onClick={handleSavePlanning} disabled={!isEditable || savingPlanning}>
+                {savingPlanning ? 'Saving...' : 'Save planning'}
+              </Button>
+              <Button onClick={handleSubmitPlan} disabled={!isEditable || savingPlanning}>
+                {savingPlanning ? 'Submitting...' : 'Submit weekly plan'}
+              </Button>
+            </>
+          }
         >
           {loading ? (
-            <p className="text-sm text-slate-600">Loading planning...</p>
+            <p className="text-sm text-text-secondary">Loading planning...</p>
           ) : (
-            <>
-              <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable || savingPlanning} />
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleSavePlanning}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900"
-                  disabled={!isEditable || savingPlanning}
-                >
-                  {savingPlanning ? 'Saving...' : 'Save planning'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmitPlan}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-                  disabled={!isEditable || savingPlanning}
-                >
-                  {savingPlanning ? 'Submitting...' : 'Submit weekly plan'}
-                </button>
-              </div>
-            </>
+            <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable || savingPlanning} />
           )}
         </SectionCard>
 
         <SectionCard
           title="Actual Output"
           description={`Update the week output. Last updated: ${formatDateTime(actualUpdatedAt)}`}
+          actions={
+            <Button onClick={handleSaveActual} disabled={!isEditable || savingActual}>
+              {savingActual ? 'Saving...' : 'Save actual output'}
+            </Button>
+          }
         >
           {loading ? (
-            <p className="text-sm text-slate-600">Loading actual output...</p>
+            <p className="text-sm text-text-secondary">Loading actual output...</p>
           ) : (
-            <>
-              <ActualOutputTableEditor rows={actualRows} setRows={setActualRows} disabled={!isEditable || savingActual} />
-              <button
-                type="button"
-                onClick={handleSaveActual}
-                className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-                disabled={!isEditable || savingActual}
-              >
-                {savingActual ? 'Saving...' : 'Save actual output'}
-              </button>
-            </>
+            <ActualOutputTableEditor rows={actualRows} setRows={setActualRows} disabled={!isEditable || savingActual} />
           )}
         </SectionCard>
-
-      </div>
-    </div>
+      </PageSurface>
+    </PageEnter>
   )
 }
