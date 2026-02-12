@@ -16,6 +16,7 @@ const StatusUpdate = require('./models/StatusUpdate');
 const { requireAuth, requireRole } = require('./middleware/auth');
 const { clearSessionCookie, setSessionCookie } = require('./utils/session');
 const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
+const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminInsights');
 const {
   buildDefaultActualOutputRows,
   buildDefaultPlanningRows,
@@ -532,6 +533,67 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
   } catch (error) {
     console.error('Admin salesmen status fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch admin dashboard data' });
+  }
+});
+
+app.get('/api/admin/insights', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const q = String(req.query?.q || '').trim();
+  const rangeResult = resolveInsightsRange({
+    from: req.query?.from,
+    to: req.query?.to,
+  });
+
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const salesmanQuery = { role: { $in: ['salesman', 'admin'] } };
+
+  if (q) {
+    const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQ, 'i');
+    salesmanQuery.$or = [{ name: regex }, { email: regex }];
+  }
+
+  try {
+    const users = await User.find(salesmanQuery)
+      .select('_id name email picture role')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    if (users.length === 0) {
+      return res.status(200).json(
+        buildInsightsPayload({
+          users,
+          reports: [],
+          range: rangeResult,
+        })
+      );
+    }
+
+    const userIds = users.map((user) => user._id);
+    const reports = await WeeklyReport.find({
+      salesmanId: { $in: userIds },
+      weekStartDateUtc: {
+        $gte: rangeResult.fromWeek.weekStartDateUtc,
+        $lte: rangeResult.toWeek.weekStartDateUtc,
+      },
+    }).lean();
+
+    return res.status(200).json(
+      buildInsightsPayload({
+        users,
+        reports,
+        range: rangeResult,
+      })
+    );
+  } catch (error) {
+    console.error('Admin insights fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch admin insights data' });
   }
 });
 

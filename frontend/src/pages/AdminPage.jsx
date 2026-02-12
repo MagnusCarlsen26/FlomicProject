@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/useAuth'
-import { ApiError, getAdminSalesmenStatus } from '../services/api'
+import { ApiError, getAdminInsights, getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
+import InsightCard from '../components/admin/InsightCard'
+import InsightsCharts from '../components/admin/InsightsCharts'
+import LocationProductivityTable from '../components/admin/LocationProductivityTable'
+import SalespersonProductivityTable from '../components/admin/SalespersonProductivityTable'
 
 const POLL_INTERVAL_MS = 30000
 
@@ -30,6 +34,10 @@ function formatDateTime(value) {
   return date.toLocaleString()
 }
 
+function formatPercent(value) {
+  return `${((value || 0) * 100).toFixed(1)}%`
+}
+
 function formatSheetDate(dateKey) {
   if (!dateKey) {
     return '-'
@@ -46,6 +54,39 @@ function formatSheetDate(dateKey) {
     month: 'short',
     day: 'numeric',
   })
+}
+
+function getIsoWeekString(date) {
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = target.getUTCDay() || 7
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
+  const weekNo = Math.ceil(((target - yearStart) / 86400000 + 1) / 7)
+  return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
+}
+
+function addWeeksToIsoWeek(isoWeek, diff) {
+  const match = /^([0-9]{4})-W([0-9]{2})$/.exec(isoWeek)
+  if (!match) {
+    return isoWeek
+  }
+
+  const year = Number(match[1])
+  const week = Number(match[2])
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Day = jan4.getUTCDay() || 7
+  const week1Monday = new Date(jan4)
+  week1Monday.setUTCDate(jan4.getUTCDate() + 1 - jan4Day)
+
+  const target = new Date(week1Monday)
+  target.setUTCDate(week1Monday.getUTCDate() + (week - 1 + diff) * 7)
+  return getIsoWeekString(target)
+}
+
+function getDefaultRangeWeeks() {
+  const toWeek = getIsoWeekString(new Date())
+  const fromWeek = addWeeksToIsoWeek(toWeek, -11)
+  return { fromWeek, toWeek }
 }
 
 function PlanningRowsTable({ rows }) {
@@ -123,18 +164,22 @@ function ActualOutputRowsTable({ rows }) {
 export default function AdminPage() {
   const { user, signOut } = useAuth()
 
+  const defaultRange = useMemo(() => getDefaultRangeWeeks(), [])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
   const [entries, setEntries] = useState([])
   const [total, setTotal] = useState(0)
   const [weekInfo, setWeekInfo] = useState(null)
+  const [insights, setInsights] = useState(null)
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const fetchCounterRef = useRef(0)
 
   const [query, setQuery] = useState('')
-  const [week, setWeek] = useState('')
+  const [fromWeek, setFromWeek] = useState(defaultRange.fromWeek)
+  const [toWeek, setToWeek] = useState(defaultRange.toWeek)
 
   const fetchDashboard = useCallback(
     async ({ silent = false } = {}) => {
@@ -148,21 +193,33 @@ export default function AdminPage() {
       }
 
       try {
-        const data = await getAdminSalesmenStatus({
-          q: query || undefined,
-          week: week || undefined,
-        })
+        const [statusData, insightsData] = await Promise.all([
+          getAdminSalesmenStatus({
+            q: query || undefined,
+            week: toWeek || undefined,
+          }),
+          getAdminInsights({
+            q: query || undefined,
+            from: fromWeek || undefined,
+            to: toWeek || undefined,
+          }),
+        ])
 
         if (fetchId !== fetchCounterRef.current) {
           return
         }
 
-        setEntries(data?.entries || [])
-        setTotal(data?.total || 0)
-        setWeekInfo(data?.week || null)
+        setEntries(statusData?.entries || [])
+        setTotal(statusData?.total || 0)
+        setWeekInfo(statusData?.week || null)
+        setInsights(insightsData || null)
 
-        if (!week && data?.week?.isoWeek) {
-          setWeek(data.week.isoWeek)
+        if (!fromWeek && insightsData?.range?.fromWeek) {
+          setFromWeek(insightsData.range.fromWeek)
+        }
+
+        if (!toWeek && insightsData?.range?.toWeek) {
+          setToWeek(insightsData.range.toWeek)
         }
 
         setLastPolledAt(new Date().toISOString())
@@ -184,7 +241,7 @@ export default function AdminPage() {
         }
       }
     },
-    [query, week],
+    [query, fromWeek, toWeek],
   )
 
   useEffect(() => {
@@ -213,16 +270,16 @@ export default function AdminPage() {
   }, [fetchDashboard])
 
   const headerSubtitle = useMemo(() => {
-    if (!weekInfo) {
+    if (!insights?.range) {
       return 'Read-only dashboard'
     }
 
-    return `Week ${weekInfo.startDate} to ${weekInfo.endDate} (${weekInfo.timezone})`
-  }, [weekInfo])
+    return `Insights range ${insights.range.from} to ${insights.range.to} (${insights.range.timezone})`
+  }, [insights])
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -252,7 +309,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
             <input
               type="text"
               placeholder="Search salesperson"
@@ -263,8 +320,14 @@ export default function AdminPage() {
             <input
               type="week"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={week}
-              onChange={(event) => setWeek(event.target.value)}
+              value={fromWeek}
+              onChange={(event) => setFromWeek(event.target.value)}
+            />
+            <input
+              type="week"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={toWeek}
+              onChange={(event) => setToWeek(event.target.value)}
             />
             <button
               type="button"
@@ -292,6 +355,79 @@ export default function AdminPage() {
             </div>
           )}
         </header>
+
+        <section className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
+            <h2 className="text-lg font-semibold text-slate-900">Insights Overview</h2>
+            <p className="mt-1 text-sm text-slate-600">Key performance metrics, conversion, and productivity trends.</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <InsightCard
+              title="Visit Completion Rate"
+              value={formatPercent(insights?.kpis?.visitCompletionRate?.value)}
+              subtitle={`${insights?.kpis?.visitCompletionRate?.numerator || 0} / ${insights?.kpis?.visitCompletionRate?.denominator || 0}`}
+            />
+            <InsightCard
+              title="Enquiry to Shipment"
+              value={formatPercent(insights?.kpis?.enquiryToShipmentConversionRate?.value)}
+              subtitle={`${insights?.totals?.shipments || 0} shipments from ${insights?.totals?.enquiries || 0} enquiries`}
+            />
+            <InsightCard
+              title="Avg Visits per Week"
+              value={(insights?.kpis?.averageVisitsPerWeekPerSalesperson?.value || 0).toFixed(2)}
+              subtitle={`${insights?.kpis?.averageVisitsPerWeekPerSalesperson?.salespeopleWithActivity || 0} active salespeople`}
+            />
+            <InsightCard
+              title="Avg Enquiry to Shipment Days"
+              value={
+                insights?.kpis?.averageDaysEnquiryToShipment === null
+                  ? 'N/A'
+                  : (insights?.kpis?.averageDaysEnquiryToShipment || 0).toFixed(1)
+              }
+              subtitle={`Samples: ${insights?.kpis?.averageDaysEnquiryToShipmentSamples || 0}`}
+            />
+            <InsightCard
+              title="Enquiries per Visit"
+              value={(insights?.kpis?.enquiriesPerVisit?.value || 0).toFixed(2)}
+              subtitle={`${insights?.kpis?.enquiriesPerVisit?.numerator || 0} enquiries / ${insights?.kpis?.enquiriesPerVisit?.denominator || 0} visits`}
+            />
+            <InsightCard
+              title="Shipments per Visit"
+              value={(insights?.kpis?.shipmentsPerVisit?.value || 0).toFixed(2)}
+              subtitle={`${insights?.kpis?.shipmentsPerVisit?.numerator || 0} shipments / ${insights?.kpis?.shipmentsPerVisit?.denominator || 0} visits`}
+            />
+            <InsightCard
+              title="Most Productive Day"
+              value={insights?.kpis?.mostProductiveDay?.day || 'N/A'}
+              subtitle={`${insights?.kpis?.mostProductiveDay?.shipments || 0} shipments, ${insights?.kpis?.mostProductiveDay?.enquiries || 0} enquiries`}
+            />
+            <InsightCard
+              title="Total Planned Visits"
+              value={String(insights?.totals?.plannedVisits || 0)}
+              subtitle={`Actual visits: ${insights?.totals?.actualVisits || 0}`}
+            />
+          </div>
+
+          <InsightsCharts charts={insights?.charts} />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Geographic Productivity</h3>
+              <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
+            </div>
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Salesperson Productivity</h3>
+              <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
+            </div>
+          </div>
+
+          {insights?.notes?.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {insights.notes.join(' ')}
+            </div>
+          )}
+        </section>
 
         <section className="space-y-3">
           {loading && <p className="text-sm text-slate-600">Loading dashboard...</p>}
@@ -327,6 +463,10 @@ export default function AdminPage() {
             </details>
           ))}
         </section>
+
+        {weekInfo && (
+          <p className="text-xs text-slate-500">Detail table week: {weekInfo.startDate} to {weekInfo.endDate}</p>
+        )}
       </div>
     </div>
   )

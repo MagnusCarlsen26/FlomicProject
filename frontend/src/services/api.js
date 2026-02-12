@@ -172,4 +172,23 @@ export async function getAdminSalesmenStatus({ week, q } = {}) {
   return apiFetch(`/api/admin/salesmen-status${suffix}`)
 }
 
+export async function getAdminInsights({ from, to, q } = {}) {
+  const params = new URLSearchParams()
+
+  if (from) {
+    params.set('from', from)
+  }
+
+  if (to) {
+    params.set('to', to)
+  }
+
+  if (q) {
+    params.set('q', q)
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/insights${suffix}`)
+}
+
 export { ApiError }
