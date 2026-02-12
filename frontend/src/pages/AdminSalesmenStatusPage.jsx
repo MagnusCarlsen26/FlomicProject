@@ -10,7 +10,6 @@ import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import { getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
-import AdminSectionTabs from '../components/admin/AdminSectionTabs'
 import { POLL_INTERVAL_MS, formatDateTime, formatSheetDate, getDefaultRangeWeeks, getErrorMessage } from './adminUtils'
 
 function PlanningRowsTable({ rows }) {
@@ -98,11 +97,15 @@ export default function AdminSalesmenStatusPage() {
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const fetchCounterRef = useRef(0)
 
-  const [query, setQuery] = useState('')
-  const [week, setWeek] = useState(defaultRange.toWeek)
+  const [queryInput, setQueryInput] = useState('')
+  const [weekInput, setWeekInput] = useState(defaultRange.toWeek)
+  const [appliedFilters, setAppliedFilters] = useState(() => ({
+    query: '',
+    week: defaultRange.toWeek,
+  }))
 
   const fetchStatus = useCallback(
-    async ({ silent = false } = {}) => {
+    async ({ silent = false, showSuccess = false } = {}) => {
       const fetchId = fetchCounterRef.current + 1
       fetchCounterRef.current = fetchId
 
@@ -114,8 +117,8 @@ export default function AdminSalesmenStatusPage() {
 
       try {
         const statusData = await getAdminSalesmenStatus({
-          q: query || undefined,
-          week: week || undefined,
+          q: appliedFilters.query || undefined,
+          week: appliedFilters.week || undefined,
         })
 
         if (fetchId !== fetchCounterRef.current) {
@@ -127,7 +130,7 @@ export default function AdminSalesmenStatusPage() {
         setWeekInfo(statusData?.week || null)
         setLastPolledAt(new Date().toISOString())
         setError(null)
-        if (!silent) {
+        if (!silent && showSuccess) {
           setSuccessMessage('Salesman status refreshed.')
         }
       } catch (e) {
@@ -144,7 +147,7 @@ export default function AdminSalesmenStatusPage() {
         }
       }
     },
-    [query, week],
+    [appliedFilters],
   )
 
   useEffect(() => {
@@ -181,13 +184,13 @@ export default function AdminSalesmenStatusPage() {
               <h1 className="mt-1 text-2xl font-bold text-text-primary">Salesmen Status</h1>
               <p className="mt-1 text-sm text-text-secondary">Detailed planning and actual output by salesperson.</p>
             </div>
-            <Button variant="secondary" onClick={() => fetchStatus()} disabled={loading || isRefreshing}>
+            <Button
+              variant="secondary"
+              onClick={() => fetchStatus({ showSuccess: true })}
+              disabled={loading || isRefreshing}
+            >
               {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-          </div>
-
-          <div className="mt-4">
-            <AdminSectionTabs />
           </div>
 
           <div className="mt-4">
@@ -195,11 +198,19 @@ export default function AdminSalesmenStatusPage() {
               <Input
                 type="text"
                 placeholder="Search salesperson"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
               />
-              <Input type="week" value={week} onChange={(event) => setWeek(event.target.value)} />
-              <Button onClick={() => fetchStatus()} disabled={loading || isRefreshing}>
+              <Input type="week" value={weekInput} onChange={(event) => setWeekInput(event.target.value)} />
+              <Button
+                onClick={() => {
+                  setAppliedFilters({
+                    query: queryInput.trim(),
+                    week: weekInput,
+                  })
+                }}
+                disabled={loading || isRefreshing}
+              >
                 {loading ? 'Loading...' : 'Apply filters'}
               </Button>
             </FilterBar>
@@ -223,7 +234,10 @@ export default function AdminSalesmenStatusPage() {
           ) : null}
 
           {entries.map((entry) => (
-            <details key={entry.salesman.id} className="glass-card rounded-3xl p-4 open:ring-1 open:ring-primary/40">
+            <details
+              key={entry.salesman.id}
+              className="rounded-3xl border border-border bg-surface p-4 shadow-soft open:ring-1 open:ring-primary/40"
+            >
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-base font-semibold text-text-primary">{entry.salesman.name || entry.salesman.email}</p>

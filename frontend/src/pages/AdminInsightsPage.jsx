@@ -8,7 +8,6 @@ import InsightCard from '../components/admin/InsightCard'
 import InsightsCharts from '../components/admin/InsightsCharts'
 import LocationProductivityTable from '../components/admin/LocationProductivityTable'
 import SalespersonProductivityTable from '../components/admin/SalespersonProductivityTable'
-import AdminSectionTabs from '../components/admin/AdminSectionTabs'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import GlassCard from '../components/ui/GlassCard'
@@ -29,12 +28,17 @@ export default function AdminInsightsPage() {
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const fetchCounterRef = useRef(0)
 
-  const [query, setQuery] = useState('')
-  const [fromWeek, setFromWeek] = useState(defaultRange.fromWeek)
-  const [toWeek, setToWeek] = useState(defaultRange.toWeek)
+  const [queryInput, setQueryInput] = useState('')
+  const [fromWeekInput, setFromWeekInput] = useState(defaultRange.fromWeek)
+  const [toWeekInput, setToWeekInput] = useState(defaultRange.toWeek)
+  const [appliedFilters, setAppliedFilters] = useState(() => ({
+    query: '',
+    fromWeek: defaultRange.fromWeek,
+    toWeek: defaultRange.toWeek,
+  }))
 
   const fetchInsights = useCallback(
-    async ({ silent = false } = {}) => {
+    async ({ silent = false, showSuccess = false } = {}) => {
       const fetchId = fetchCounterRef.current + 1
       fetchCounterRef.current = fetchId
 
@@ -46,9 +50,9 @@ export default function AdminInsightsPage() {
 
       try {
         const insightsData = await getAdminInsights({
-          q: query || undefined,
-          from: fromWeek || undefined,
-          to: toWeek || undefined,
+          q: appliedFilters.query || undefined,
+          from: appliedFilters.fromWeek || undefined,
+          to: appliedFilters.toWeek || undefined,
         })
 
         if (fetchId !== fetchCounterRef.current) {
@@ -58,7 +62,7 @@ export default function AdminInsightsPage() {
         setInsights(insightsData || null)
         setLastPolledAt(new Date().toISOString())
         setError(null)
-        if (!silent) {
+        if (!silent && showSuccess) {
           setSuccessMessage('Insights refreshed.')
         }
       } catch (e) {
@@ -75,7 +79,7 @@ export default function AdminInsightsPage() {
         }
       }
     },
-    [query, fromWeek, toWeek],
+    [appliedFilters],
   )
 
   useEffect(() => {
@@ -121,13 +125,13 @@ export default function AdminInsightsPage() {
               <p className="mt-1 text-sm text-text-secondary">{headerSubtitle}</p>
               <p className="mt-1 text-sm text-text-secondary">Signed in as {user?.name || user?.email || 'Unknown user'}</p>
             </div>
-            <Button variant="secondary" onClick={() => fetchInsights()} disabled={loading || isRefreshing}>
+            <Button
+              variant="secondary"
+              onClick={() => fetchInsights({ showSuccess: true })}
+              disabled={loading || isRefreshing}
+            >
               {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-          </div>
-
-          <div className="mt-4">
-            <AdminSectionTabs />
           </div>
 
           <div className="mt-4">
@@ -135,12 +139,21 @@ export default function AdminInsightsPage() {
               <Input
                 type="text"
                 placeholder="Search salesperson"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
               />
-              <Input type="week" value={fromWeek} onChange={(event) => setFromWeek(event.target.value)} />
-              <Input type="week" value={toWeek} onChange={(event) => setToWeek(event.target.value)} />
-              <Button onClick={() => fetchInsights()} disabled={loading || isRefreshing}>
+              <Input type="week" value={fromWeekInput} onChange={(event) => setFromWeekInput(event.target.value)} />
+              <Input type="week" value={toWeekInput} onChange={(event) => setToWeekInput(event.target.value)} />
+              <Button
+                onClick={() => {
+                  setAppliedFilters({
+                    query: queryInput.trim(),
+                    fromWeek: fromWeekInput,
+                    toWeek: toWeekInput,
+                  })
+                }}
+                disabled={loading || isRefreshing}
+              >
                 {loading ? 'Loading...' : 'Apply filters'}
               </Button>
             </FilterBar>

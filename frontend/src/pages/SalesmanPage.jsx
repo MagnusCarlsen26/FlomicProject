@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import PageSurface from '../components/layout/PageSurface'
 import StatTile from '../components/layout/StatTile'
 import PageEnter from '../components/motion/PageEnter'
@@ -94,6 +94,65 @@ function SectionCard({ title, description, actions, children }) {
   )
 }
 
+const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled }) {
+  return (
+    <tr>
+      <td>{row.isoWeek ?? '-'}</td>
+      <td>{formatSheetDate(row.date)}</td>
+      <td>
+        <Input
+          type="text"
+          value={row.customerName || ''}
+          onChange={(event) => updateRow(index, 'customerName', event.target.value)}
+          disabled={disabled}
+        />
+      </td>
+      <td>
+        <Input
+          type="text"
+          value={row.locationArea || ''}
+          onChange={(event) => updateRow(index, 'locationArea', event.target.value)}
+          disabled={disabled}
+        />
+      </td>
+      <td>
+        <Select
+          value={row.customerType || ''}
+          onChange={(event) => updateRow(index, 'customerType', event.target.value)}
+          disabled={disabled}
+        >
+          {CUSTOMER_TYPE_OPTIONS.map((option) => (
+            <option key={option.value || 'empty'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Select
+          value={row.contactType || ''}
+          onChange={(event) => updateRow(index, 'contactType', event.target.value)}
+          disabled={disabled}
+        >
+          {CONTACT_TYPE_OPTIONS.map((option) => (
+            <option key={option.value || 'empty'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Input
+          type="text"
+          value={row.jsvWithWhom || ''}
+          onChange={(event) => updateRow(index, 'jsvWithWhom', event.target.value)}
+          disabled={disabled || row.contactType !== 'jsv'}
+        />
+      </td>
+    </tr>
+  )
+})
+
 function PlanningTableEditor({ rows, setRows, disabled }) {
   const updateRow = useCallback(
     (index, field, value) => {
@@ -135,66 +194,61 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row.date || `planning-row-${index}`}>
-              <td>{row.isoWeek ?? '-'}</td>
-              <td>{formatSheetDate(row.date)}</td>
-              <td>
-                <Input
-                  type="text"
-                  value={row.customerName || ''}
-                  onChange={(event) => updateRow(index, 'customerName', event.target.value)}
-                  disabled={disabled}
-                />
-              </td>
-              <td>
-                <Input
-                  type="text"
-                  value={row.locationArea || ''}
-                  onChange={(event) => updateRow(index, 'locationArea', event.target.value)}
-                  disabled={disabled}
-                />
-              </td>
-              <td>
-                <Select
-                  value={row.customerType || ''}
-                  onChange={(event) => updateRow(index, 'customerType', event.target.value)}
-                  disabled={disabled}
-                >
-                  {CUSTOMER_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value || 'empty'} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </td>
-              <td>
-                <Select
-                  value={row.contactType || ''}
-                  onChange={(event) => updateRow(index, 'contactType', event.target.value)}
-                  disabled={disabled}
-                >
-                  {CONTACT_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value || 'empty'} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </td>
-              <td>
-                <Input
-                  type="text"
-                  value={row.jsvWithWhom || ''}
-                  onChange={(event) => updateRow(index, 'jsvWithWhom', event.target.value)}
-                  disabled={disabled || row.contactType !== 'jsv'}
-                />
-              </td>
-            </tr>
+            <PlanningRow key={row.date || `planning-row-${index}`} row={row} index={index} updateRow={updateRow} disabled={disabled} />
           ))}
         </tbody>
       </table>
     </DataTableFrame>
   )
 }
+
+const ActualOutputRow = memo(function ActualOutputRow({ row, index, updateRow, disabled }) {
+  return (
+    <tr>
+      <td>{row.isoWeek ?? '-'}</td>
+      <td>{formatSheetDate(row.date)}</td>
+      <td>
+        <Select
+          value={row.visited || ''}
+          onChange={(event) => updateRow(index, 'visited', event.target.value)}
+          disabled={disabled}
+        >
+          {VISITED_OPTIONS.map((option) => (
+            <option key={option.value || 'empty'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Input
+          type="text"
+          value={row.notVisitedReason || ''}
+          onChange={(event) => updateRow(index, 'notVisitedReason', event.target.value)}
+          disabled={disabled || row.visited !== 'no'}
+        />
+      </td>
+      <td>
+        <Input
+          type="number"
+          min="0"
+          value={row.enquiriesReceived ?? 0}
+          onChange={(event) => updateRow(index, 'enquiriesReceived', event.target.value)}
+          disabled={disabled}
+        />
+      </td>
+      <td>
+        <Input
+          type="number"
+          min="0"
+          value={row.shipmentsConverted ?? 0}
+          onChange={(event) => updateRow(index, 'shipmentsConverted', event.target.value)}
+          disabled={disabled}
+        />
+      </td>
+    </tr>
+  )
+})
 
 function ActualOutputTableEditor({ rows, setRows, disabled }) {
   const updateRow = useCallback(
@@ -240,55 +294,69 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row.date || `actual-row-${index}`}>
-              <td>{row.isoWeek ?? '-'}</td>
-              <td>{formatSheetDate(row.date)}</td>
-              <td>
-                <Select
-                  value={row.visited || ''}
-                  onChange={(event) => updateRow(index, 'visited', event.target.value)}
-                  disabled={disabled}
-                >
-                  {VISITED_OPTIONS.map((option) => (
-                    <option key={option.value || 'empty'} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </td>
-              <td>
-                <Input
-                  type="text"
-                  value={row.notVisitedReason || ''}
-                  onChange={(event) => updateRow(index, 'notVisitedReason', event.target.value)}
-                  disabled={disabled || row.visited !== 'no'}
-                />
-              </td>
-              <td>
-                <Input
-                  type="number"
-                  min="0"
-                  value={row.enquiriesReceived ?? 0}
-                  onChange={(event) => updateRow(index, 'enquiriesReceived', event.target.value)}
-                  disabled={disabled}
-                />
-              </td>
-              <td>
-                <Input
-                  type="number"
-                  min="0"
-                  value={row.shipmentsConverted ?? 0}
-                  onChange={(event) => updateRow(index, 'shipmentsConverted', event.target.value)}
-                  disabled={disabled}
-                />
-              </td>
-            </tr>
+            <ActualOutputRow
+              key={row.date || `actual-row-${index}`}
+              row={row}
+              index={index}
+              updateRow={updateRow}
+              disabled={disabled}
+            />
           ))}
         </tbody>
       </table>
     </DataTableFrame>
   )
 }
+
+const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
+  pageTitle,
+  userDisplayName,
+  week,
+  planningSubmittedAt,
+  actualUpdatedAt,
+  isEditable,
+  error,
+  successMessage,
+  loading,
+  onRefresh,
+}) {
+  return (
+    <GlassCard className="overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Salesman</p>
+          <h1 className="mt-1 text-2xl font-bold text-text-primary">{pageTitle}</h1>
+          <p className="mt-2 text-sm text-text-secondary">Signed in as {userDisplayName}</p>
+        </div>
+        <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </div>
+
+      <StaggerGroup className="mt-5 grid gap-3 md:grid-cols-3">
+        <RevealCard>
+          <StatTile
+            label="Week Range"
+            value={week ? `${week.startDate} to ${week.endDate}` : 'Pending'}
+            detail={week?.timezone || 'Timezone pending'}
+          />
+        </RevealCard>
+        <RevealCard>
+          <StatTile label="Planning Status" value={planningSubmittedAt ? 'Submitted' : 'Draft'} detail={formatDateTime(planningSubmittedAt)} />
+        </RevealCard>
+        <RevealCard>
+          <StatTile label="Actual Output" value={actualUpdatedAt ? 'Updated' : 'Not updated'} detail={formatDateTime(actualUpdatedAt)} />
+        </RevealCard>
+      </StaggerGroup>
+
+      <div className="mt-5 space-y-3">
+        {!isEditable ? <Alert tone="warning">Editing is locked because the IST week has ended.</Alert> : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
+      </div>
+    </GlassCard>
+  )
+})
 
 export default function SalesmanPage() {
   const { user } = useAuth()
@@ -339,6 +407,7 @@ export default function SalesmanPage() {
   }, [week])
 
   const isEditable = week?.isEditable !== false
+  const userDisplayName = user?.name || user?.email || 'Unknown user'
 
   const handleSavePlanning = useCallback(async () => {
     if (!week?.key) {
@@ -410,40 +479,18 @@ export default function SalesmanPage() {
   return (
     <PageEnter>
       <PageSurface>
-        <GlassCard className="overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Salesman</p>
-              <h1 className="mt-1 text-2xl font-bold text-text-primary">{pageTitle}</h1>
-              <p className="mt-2 text-sm text-text-secondary">Signed in as {user?.name || user?.email || 'Unknown user'}</p>
-            </div>
-            <Button variant="secondary" onClick={loadCurrentWeek} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
-
-          <StaggerGroup className="mt-5 grid gap-3 md:grid-cols-3">
-            <RevealCard>
-              <StatTile
-                label="Week Range"
-                value={week ? `${week.startDate} to ${week.endDate}` : 'Pending'}
-                detail={week?.timezone || 'Timezone pending'}
-              />
-            </RevealCard>
-            <RevealCard>
-              <StatTile label="Planning Status" value={planningSubmittedAt ? 'Submitted' : 'Draft'} detail={formatDateTime(planningSubmittedAt)} />
-            </RevealCard>
-            <RevealCard>
-              <StatTile label="Actual Output" value={actualUpdatedAt ? 'Updated' : 'Not updated'} detail={formatDateTime(actualUpdatedAt)} />
-            </RevealCard>
-          </StaggerGroup>
-
-          <div className="mt-5 space-y-3">
-            {!isEditable ? <Alert tone="warning">Editing is locked because the IST week has ended.</Alert> : null}
-            {error ? <Alert tone="error">{error}</Alert> : null}
-            {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
-          </div>
-        </GlassCard>
+        <SalesmanHeaderCard
+          pageTitle={pageTitle}
+          userDisplayName={userDisplayName}
+          week={week}
+          planningSubmittedAt={planningSubmittedAt}
+          actualUpdatedAt={actualUpdatedAt}
+          isEditable={isEditable}
+          error={error}
+          successMessage={successMessage}
+          loading={loading}
+          onRefresh={loadCurrentWeek}
+        />
 
         <SectionCard
           title="Planning"
