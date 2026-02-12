@@ -58,10 +58,7 @@ export default function InsightsCharts({ charts }) {
 
   return (
     <div className="space-y-5">
-      <ChartGroup
-        title="Execution Tracking"
-        description="Monitor planned coverage against actual field activity and daily output rhythm."
-      >
+      <ChartGroup title="Execution Tracking">
         <div className="grid gap-4 xl:grid-cols-2">
           <ChartPanel title="Actual vs Planned Visits by Salesperson">
             <ResponsiveContainer width="100%" height="100%">
@@ -93,10 +90,7 @@ export default function InsightsCharts({ charts }) {
         </div>
       </ChartGroup>
 
-      <ChartGroup
-        title="Conversion & Mix"
-        description="Compare conversion quality across channels while tracking contact type distribution."
-      >
+      <ChartGroup title="Conversion & Mix">
         <div className="grid gap-4 xl:grid-cols-3">
           <ChartPanel title="Conversion by Customer Type">
             <ResponsiveContainer width="100%" height="100%">

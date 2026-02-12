@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import FilterBar from '../components/layout/FilterBar'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
 import RevealCard from '../components/motion/RevealCard'
@@ -11,14 +10,12 @@ import SalespersonProductivityTable from '../components/admin/SalespersonProduct
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import GlassCard from '../components/ui/GlassCard'
-import Input from '../components/ui/Input'
 import { useAuth } from '../context/useAuth'
 import { getAdminInsights } from '../services/api'
-import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getDefaultRangeWeeks, getErrorMessage } from './adminUtils'
+import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
 
 export default function AdminInsightsPage() {
   const { user } = useAuth()
-  const defaultRange = useMemo(() => getDefaultRangeWeeks(), [])
 
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -27,15 +24,6 @@ export default function AdminInsightsPage() {
   const [insights, setInsights] = useState(null)
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const fetchCounterRef = useRef(0)
-
-  const [queryInput, setQueryInput] = useState('')
-  const [fromWeekInput, setFromWeekInput] = useState(defaultRange.fromWeek)
-  const [toWeekInput, setToWeekInput] = useState(defaultRange.toWeek)
-  const [appliedFilters, setAppliedFilters] = useState(() => ({
-    query: '',
-    fromWeek: defaultRange.fromWeek,
-    toWeek: defaultRange.toWeek,
-  }))
 
   const fetchInsights = useCallback(
     async ({ silent = false, showSuccess = false } = {}) => {
@@ -49,11 +37,7 @@ export default function AdminInsightsPage() {
       }
 
       try {
-        const insightsData = await getAdminInsights({
-          q: appliedFilters.query || undefined,
-          from: appliedFilters.fromWeek || undefined,
-          to: appliedFilters.toWeek || undefined,
-        })
+        const insightsData = await getAdminInsights()
 
         if (fetchId !== fetchCounterRef.current) {
           return
@@ -79,7 +63,7 @@ export default function AdminInsightsPage() {
         }
       }
     },
-    [appliedFilters],
+    [],
   )
 
   useEffect(() => {
@@ -123,7 +107,6 @@ export default function AdminInsightsPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Admin</p>
               <h1 className="mt-1 text-2xl font-bold text-text-primary">Insights</h1>
               <p className="mt-1 text-sm text-text-secondary">{headerSubtitle}</p>
-              <p className="mt-1 text-sm text-text-secondary">Signed in as {user?.name || user?.email || 'Unknown user'}</p>
             </div>
             <Button
               variant="secondary"
@@ -132,31 +115,6 @@ export default function AdminInsightsPage() {
             >
               {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-          </div>
-
-          <div className="mt-4">
-            <FilterBar>
-              <Input
-                type="text"
-                placeholder="Search salesperson"
-                value={queryInput}
-                onChange={(event) => setQueryInput(event.target.value)}
-              />
-              <Input type="week" value={fromWeekInput} onChange={(event) => setFromWeekInput(event.target.value)} />
-              <Input type="week" value={toWeekInput} onChange={(event) => setToWeekInput(event.target.value)} />
-              <Button
-                onClick={() => {
-                  setAppliedFilters({
-                    query: queryInput.trim(),
-                    fromWeek: fromWeekInput,
-                    toWeek: toWeekInput,
-                  })
-                }}
-                disabled={loading || isRefreshing}
-              >
-                {loading ? 'Loading...' : 'Apply filters'}
-              </Button>
-            </FilterBar>
           </div>
 
           <p className="mt-3 text-sm text-text-secondary">Last refresh: {formatDateTime(lastPolledAt)}</p>
@@ -168,10 +126,6 @@ export default function AdminInsightsPage() {
         </GlassCard>
 
         <section className="space-y-5">
-          <GlassCard>
-            <h2 className="text-lg font-semibold text-text-primary">Insights Overview</h2>
-            <p className="mt-1 text-sm text-text-secondary">Key performance metrics, conversion, and productivity trends.</p>
-          </GlassCard>
 
           <GlassCard className="space-y-4">
             <div>
@@ -179,32 +133,19 @@ export default function AdminInsightsPage() {
             </div>
             <StaggerGroup className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <RevealCard>
-                <InsightCard
-                  title="Visit Completion Rate"
-                  value={formatPercent(insights?.kpis?.visitCompletionRate?.value)}
-                  subtitle={`${insights?.kpis?.visitCompletionRate?.numerator || 0} / ${insights?.kpis?.visitCompletionRate?.denominator || 0}`}
-                />
+                <InsightCard title="Visit Completion Rate" value={formatPercent(insights?.kpis?.visitCompletionRate?.value)} />
               </RevealCard>
               <RevealCard>
-                <InsightCard
-                  title="Total Planned Visits"
-                  value={String(insights?.totals?.plannedVisits || 0)}
-                  subtitle={`Actual visits: ${insights?.totals?.actualVisits || 0}`}
-                />
+                <InsightCard title="Total Planned Visits" value={String(insights?.totals?.plannedVisits || 0)} />
               </RevealCard>
               <RevealCard>
                 <InsightCard
                   title="Avg Visits per Week"
                   value={(insights?.kpis?.averageVisitsPerWeekPerSalesperson?.value || 0).toFixed(2)}
-                  subtitle={`${insights?.kpis?.averageVisitsPerWeekPerSalesperson?.salespeopleWithActivity || 0} active salespeople`}
                 />
               </RevealCard>
               <RevealCard>
-                <InsightCard
-                  title="Most Productive Day"
-                  value={insights?.kpis?.mostProductiveDay?.day || 'N/A'}
-                  subtitle={`${insights?.kpis?.mostProductiveDay?.shipments || 0} shipments, ${insights?.kpis?.mostProductiveDay?.enquiries || 0} enquiries`}
-                />
+                <InsightCard title="Most Productive Day" value={insights?.kpis?.mostProductiveDay?.day || 'N/A'} />
               </RevealCard>
             </StaggerGroup>
 
@@ -214,25 +155,13 @@ export default function AdminInsightsPage() {
 
             <StaggerGroup className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <RevealCard>
-                <InsightCard
-                  title="Enquiry to Shipment"
-                  value={formatPercent(insights?.kpis?.enquiryToShipmentConversionRate?.value)}
-                  subtitle={`${insights?.totals?.shipments || 0} shipments from ${insights?.totals?.enquiries || 0} enquiries`}
-                />
+                <InsightCard title="Enquiry to Shipment" value={formatPercent(insights?.kpis?.enquiryToShipmentConversionRate?.value)} />
               </RevealCard>
               <RevealCard>
-                <InsightCard
-                  title="Enquiries per Visit"
-                  value={(insights?.kpis?.enquiriesPerVisit?.value || 0).toFixed(2)}
-                  subtitle={`${insights?.kpis?.enquiriesPerVisit?.numerator || 0} enquiries / ${insights?.kpis?.enquiriesPerVisit?.denominator || 0} visits`}
-                />
+                <InsightCard title="Enquiries per Visit" value={(insights?.kpis?.enquiriesPerVisit?.value || 0).toFixed(2)} />
               </RevealCard>
               <RevealCard>
-                <InsightCard
-                  title="Shipments per Visit"
-                  value={(insights?.kpis?.shipmentsPerVisit?.value || 0).toFixed(2)}
-                  subtitle={`${insights?.kpis?.shipmentsPerVisit?.numerator || 0} shipments / ${insights?.kpis?.shipmentsPerVisit?.denominator || 0} visits`}
-                />
+                <InsightCard title="Shipments per Visit" value={(insights?.kpis?.shipmentsPerVisit?.value || 0).toFixed(2)} />
               </RevealCard>
               <RevealCard>
                 <InsightCard
@@ -242,7 +171,6 @@ export default function AdminInsightsPage() {
                       ? 'N/A'
                       : (insights?.kpis?.averageDaysEnquiryToShipment || 0).toFixed(1)
                   }
-                  subtitle={`Samples: ${insights?.kpis?.averageDaysEnquiryToShipmentSamples || 0}`}
                 />
               </RevealCard>
             </StaggerGroup>

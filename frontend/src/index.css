@@ -94,16 +94,25 @@
     position: relative;
   }
 
+  .table-core {
+    border-collapse: separate;
+    border-spacing: 0 0.45rem;
+  }
+
   .table-core thead {
     background: color-mix(in srgb, rgb(var(--color-surface-muted)) 90%, transparent);
   }
 
   .table-core tbody tr {
     border-top: 1px solid rgb(var(--color-border) / 0.8);
+    transition: background 0.2s ease;
   }
 
   .table-core tbody tr:nth-child(even) {
     background: color-mix(in srgb, rgb(var(--color-surface-muted)) 45%, transparent);
+  }
+  .table-core tbody tr:hover {
+    background: color-mix(in srgb, rgb(var(--color-surface-muted)) 55%, transparent);
   }
 
   .table-core th {
@@ -112,14 +121,15 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     font-weight: 700;
-    padding: 0.65rem 0.75rem;
+    padding: 0.85rem 0.9rem;
     text-align: left;
   }
 
   .table-core td {
     color: rgb(var(--color-text-primary));
     font-size: 0.875rem;
-    padding: 0.65rem 0.75rem;
+    padding: 0.85rem 0.9rem;
+    line-height: 1.4;
   }
 
   .gradient-text {
@@ -127,5 +137,47 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  .google-signin-button {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .google-signin-button > div {
+    width: min(320px, 100%);
+    border-radius: 999px;
+    background: transparent !important;
+    padding: 0;
+  }
+
+  .google-signin-button .g_id_signin {
+    width: 100% !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .google-signin-button .g_id_signin button {
+    width: 100% !important;
+    border-radius: 999px !important;
+    background: color-mix(in srgb, rgb(var(--color-surface)) 85%, transparent) !important;
+    color: rgb(var(--color-text-primary)) !important;
+    border: 1px solid rgb(var(--color-border) / 0.6) !important;
+    box-shadow: 0 15px 35px rgb(0 0 0 / 0.45) !important;
+    font-weight: 600 !important;
+    padding: 0.85rem 1.5rem !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .google-signin-button .g_id_signin button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 20px 35px rgb(0 0 0 / 0.55) !important;
+  }
+
+  .google-signin-button .g_id_signin button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.45) !important;
   }
 }

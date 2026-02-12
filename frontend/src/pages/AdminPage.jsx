@@ -56,39 +56,6 @@ function formatSheetDate(dateKey) {
   })
 }
 
-function getIsoWeekString(date) {
-  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = target.getUTCDay() || 7
-  target.setUTCDate(target.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
-  const weekNo = Math.ceil(((target - yearStart) / 86400000 + 1) / 7)
-  return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
-}
-
-function addWeeksToIsoWeek(isoWeek, diff) {
-  const match = /^([0-9]{4})-W([0-9]{2})$/.exec(isoWeek)
-  if (!match) {
-    return isoWeek
-  }
-
-  const year = Number(match[1])
-  const week = Number(match[2])
-  const jan4 = new Date(Date.UTC(year, 0, 4))
-  const jan4Day = jan4.getUTCDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setUTCDate(jan4.getUTCDate() + 1 - jan4Day)
-
-  const target = new Date(week1Monday)
-  target.setUTCDate(week1Monday.getUTCDate() + (week - 1 + diff) * 7)
-  return getIsoWeekString(target)
-}
-
-function getDefaultRangeWeeks() {
-  const toWeek = getIsoWeekString(new Date())
-  const fromWeek = addWeeksToIsoWeek(toWeek, -11)
-  return { fromWeek, toWeek }
-}
-
 function PlanningRowsTable({ rows }) {
   if (!rows?.length) {
     return <p className="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-600">No rows</p>
@@ -164,8 +131,6 @@ function ActualOutputRowsTable({ rows }) {
 export default function AdminPage() {
   const { user, signOut } = useAuth()
 
-  const defaultRange = useMemo(() => getDefaultRangeWeeks(), [])
-
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
@@ -176,10 +141,6 @@ export default function AdminPage() {
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const fetchCounterRef = useRef(0)
-
-  const [query, setQuery] = useState('')
-  const [fromWeek, setFromWeek] = useState(defaultRange.fromWeek)
-  const [toWeek, setToWeek] = useState(defaultRange.toWeek)
 
   const fetchDashboard = useCallback(
     async ({ silent = false } = {}) => {
@@ -193,17 +154,7 @@ export default function AdminPage() {
       }
 
       try {
-        const [statusData, insightsData] = await Promise.all([
-          getAdminSalesmenStatus({
-            q: query || undefined,
-            week: toWeek || undefined,
-          }),
-          getAdminInsights({
-            q: query || undefined,
-            from: fromWeek || undefined,
-            to: toWeek || undefined,
-          }),
-        ])
+        const [statusData, insightsData] = await Promise.all([getAdminSalesmenStatus(), getAdminInsights()])
 
         if (fetchId !== fetchCounterRef.current) {
           return
@@ -213,14 +164,6 @@ export default function AdminPage() {
         setTotal(statusData?.total || 0)
         setWeekInfo(statusData?.week || null)
         setInsights(insightsData || null)
-
-        if (!fromWeek && insightsData?.range?.fromWeek) {
-          setFromWeek(insightsData.range.fromWeek)
-        }
-
-        if (!toWeek && insightsData?.range?.toWeek) {
-          setToWeek(insightsData.range.toWeek)
-        }
 
         setLastPolledAt(new Date().toISOString())
         if (!silent) {
@@ -241,7 +184,7 @@ export default function AdminPage() {
         }
       }
     },
-    [query, fromWeek, toWeek],
+    [],
   )
 
   useEffect(() => {
@@ -286,9 +229,6 @@ export default function AdminPage() {
               <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Salesmen Dashboard</h1>
               <p className="mt-1 text-sm text-slate-600">{headerSubtitle}</p>
-              <p className="mt-1 text-sm text-slate-600">
-                Signed in as {user?.name || user?.email || 'Unknown user'}
-              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -309,36 +249,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <input
-              type="text"
-              placeholder="Search salesperson"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <input
-              type="week"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={fromWeek}
-              onChange={(event) => setFromWeek(event.target.value)}
-            />
-            <input
-              type="week"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={toWeek}
-              onChange={(event) => setToWeek(event.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => fetchDashboard()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-              disabled={loading || isRefreshing}
-            >
-              {loading ? 'Loading...' : 'Apply filters'}
-            </button>
-          </div>
-
           <div className="mt-3 text-sm text-slate-600">
             Showing {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}
           </div>
@@ -357,57 +267,27 @@ export default function AdminPage() {
         </header>
 
         <section className="space-y-5">
-          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
-            <h2 className="text-lg font-semibold text-slate-900">Insights Overview</h2>
-            <p className="mt-1 text-sm text-slate-600">Key performance metrics, conversion, and productivity trends.</p>
-          </div>
-
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Execution</h3>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <InsightCard
-                title="Visit Completion Rate"
-                value={formatPercent(insights?.kpis?.visitCompletionRate?.value)}
-                subtitle={`${insights?.kpis?.visitCompletionRate?.numerator || 0} / ${insights?.kpis?.visitCompletionRate?.denominator || 0}`}
-              />
-              <InsightCard
-                title="Total Planned Visits"
-                value={String(insights?.totals?.plannedVisits || 0)}
-                subtitle={`Actual visits: ${insights?.totals?.actualVisits || 0}`}
-              />
+              <InsightCard title="Visit Completion Rate" value={formatPercent(insights?.kpis?.visitCompletionRate?.value)} />
+              <InsightCard title="Total Planned Visits" value={String(insights?.totals?.plannedVisits || 0)} />
               <InsightCard
                 title="Avg Visits per Week"
                 value={(insights?.kpis?.averageVisitsPerWeekPerSalesperson?.value || 0).toFixed(2)}
-                subtitle={`${insights?.kpis?.averageVisitsPerWeekPerSalesperson?.salespeopleWithActivity || 0} active salespeople`}
               />
-              <InsightCard
-                title="Most Productive Day"
-                value={insights?.kpis?.mostProductiveDay?.day || 'N/A'}
-                subtitle={`${insights?.kpis?.mostProductiveDay?.shipments || 0} shipments, ${insights?.kpis?.mostProductiveDay?.enquiries || 0} enquiries`}
-              />
+              <InsightCard title="Most Productive Day" value={insights?.kpis?.mostProductiveDay?.day || 'N/A'} />
             </div>
 
             <div className="border-t border-slate-200 pt-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conversion & Efficiency</h3>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <InsightCard
-                title="Enquiry to Shipment"
-                value={formatPercent(insights?.kpis?.enquiryToShipmentConversionRate?.value)}
-                subtitle={`${insights?.totals?.shipments || 0} shipments from ${insights?.totals?.enquiries || 0} enquiries`}
-              />
-              <InsightCard
-                title="Enquiries per Visit"
-                value={(insights?.kpis?.enquiriesPerVisit?.value || 0).toFixed(2)}
-                subtitle={`${insights?.kpis?.enquiriesPerVisit?.numerator || 0} enquiries / ${insights?.kpis?.enquiriesPerVisit?.denominator || 0} visits`}
-              />
-              <InsightCard
-                title="Shipments per Visit"
-                value={(insights?.kpis?.shipmentsPerVisit?.value || 0).toFixed(2)}
-                subtitle={`${insights?.kpis?.shipmentsPerVisit?.numerator || 0} shipments / ${insights?.kpis?.shipmentsPerVisit?.denominator || 0} visits`}
-              />
+              <InsightCard title="Enquiry to Shipment" value={formatPercent(insights?.kpis?.enquiryToShipmentConversionRate?.value)} />
+              <InsightCard title="Enquiries per Visit" value={(insights?.kpis?.enquiriesPerVisit?.value || 0).toFixed(2)} />
+              <InsightCard title="Shipments per Visit" value={(insights?.kpis?.shipmentsPerVisit?.value || 0).toFixed(2)} />
               <InsightCard
                 title="Avg Enquiry to Shipment Days"
                 value={
@@ -415,7 +295,6 @@ export default function AdminPage() {
                     ? 'N/A'
                     : (insights?.kpis?.averageDaysEnquiryToShipment || 0).toFixed(1)
                 }
-                subtitle={`Samples: ${insights?.kpis?.averageDaysEnquiryToShipmentSamples || 0}`}
               />
             </div>
           </div>

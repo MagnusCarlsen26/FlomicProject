@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import PageSurface from '../components/layout/PageSurface'
 import StatTile from '../components/layout/StatTile'
 import PageEnter from '../components/motion/PageEnter'
@@ -10,7 +10,6 @@ import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
-import { useAuth } from '../context/useAuth'
 import {
   ApiError,
   getSalesmanCurrentWeek,
@@ -22,6 +21,7 @@ import {
   CUSTOMER_TYPE_OPTIONS,
   VISITED_OPTIONS,
 } from '../constants/weeklyReportFields'
+import { formatDateTime, formatSheetDate } from '../utils/dateFormat'
 
 function getErrorMessage(error) {
   if (error instanceof ApiError) {
@@ -35,36 +35,6 @@ function getErrorMessage(error) {
   return 'Request failed'
 }
 
-function formatDateTime(value) {
-  if (!value) {
-    return 'Not updated yet'
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return 'Invalid date'
-  }
-
-  return date.toLocaleString()
-}
-
-function formatSheetDate(dateKey) {
-  if (!dateKey) {
-    return '-'
-  }
-
-  const date = new Date(`${dateKey}T00:00:00.000Z`)
-  if (Number.isNaN(date.getTime())) {
-    return dateKey
-  }
-
-  return date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
 
 function toNonNegativeInteger(value) {
   if (value === '' || value === null || value === undefined) {
@@ -309,8 +279,6 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
 }
 
 const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
-  pageTitle,
-  userDisplayName,
   week,
   planningSubmittedAt,
   actualUpdatedAt,
@@ -325,8 +293,6 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Salesman</p>
-          <h1 className="mt-1 text-2xl font-bold text-text-primary">{pageTitle}</h1>
-          <p className="mt-2 text-sm text-text-secondary">Signed in as {userDisplayName}</p>
         </div>
         <Button variant="secondary" onClick={onRefresh} disabled={loading}>
           {loading ? 'Refreshing...' : 'Refresh'}
@@ -337,7 +303,11 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
         <RevealCard>
           <StatTile
             label="Week Range"
-            value={week ? `${week.startDate} to ${week.endDate}` : 'Pending'}
+            value={
+              week
+                ? `${formatSheetDate(week.startDate)} – ${formatSheetDate(week.endDate)}`
+                : 'Pending'
+            }
             detail={week?.timezone || 'Timezone pending'}
           />
         </RevealCard>
@@ -359,8 +329,6 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
 })
 
 export default function SalesmanPage() {
-  const { user } = useAuth()
-
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
@@ -371,7 +339,6 @@ export default function SalesmanPage() {
   const [planningSubmittedAt, setPlanningSubmittedAt] = useState(null)
   const [actualUpdatedAt, setActualUpdatedAt] = useState(null)
 
-  const [savingPlanning, setSavingPlanning] = useState(false)
   const [savingActual, setSavingActual] = useState(false)
 
   const loadCurrentWeek = useCallback(async () => {
@@ -398,63 +365,7 @@ export default function SalesmanPage() {
     loadCurrentWeek()
   }, [loadCurrentWeek])
 
-  const pageTitle = useMemo(() => {
-    if (!week) {
-      return 'Current Week Workspace'
-    }
-
-    return `Current Week Workspace (${week.startDate} to ${week.endDate} ${week.timezone})`
-  }, [week])
-
   const isEditable = week?.isEditable !== false
-  const userDisplayName = user?.name || user?.email || 'Unknown user'
-
-  const handleSavePlanning = useCallback(async () => {
-    if (!week?.key) {
-      return
-    }
-
-    setSavingPlanning(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const data = await updateSalesmanPlanning({ weekKey: week.key, rows: planningRows })
-      setPlanningRows(data?.planning?.rows || [])
-      setPlanningSubmittedAt(data?.planning?.submittedAt || planningSubmittedAt)
-      setSuccessMessage('Planning saved successfully.')
-    } catch (e) {
-      setError(getErrorMessage(e))
-    } finally {
-      setSavingPlanning(false)
-    }
-  }, [planningRows, planningSubmittedAt, week?.key])
-
-  const handleSubmitPlan = useCallback(async () => {
-    if (!week?.key) {
-      return
-    }
-
-    setSavingPlanning(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const data = await updateSalesmanPlanning({
-        weekKey: week.key,
-        rows: planningRows,
-        submitted: true,
-      })
-      setPlanningRows(data?.planning?.rows || [])
-      setPlanningSubmittedAt(data?.planning?.submittedAt || null)
-      setSuccessMessage('Weekly plan submitted successfully.')
-    } catch (e) {
-      setError(getErrorMessage(e))
-    } finally {
-      setSavingPlanning(false)
-    }
-  }, [planningRows, week?.key])
-
   const handleSaveActual = useCallback(async () => {
     if (!week?.key) {
       return
@@ -480,8 +391,6 @@ export default function SalesmanPage() {
     <PageEnter>
       <PageSurface>
         <SalesmanHeaderCard
-          pageTitle={pageTitle}
-          userDisplayName={userDisplayName}
           week={week}
           planningSubmittedAt={planningSubmittedAt}
           actualUpdatedAt={actualUpdatedAt}
@@ -494,28 +403,18 @@ export default function SalesmanPage() {
 
         <SectionCard
           title="Planning"
-          description={`Build your weekly plan. Last submitted: ${formatDateTime(planningSubmittedAt)}`}
-          actions={
-            <>
-              <Button variant="secondary" onClick={handleSavePlanning} disabled={!isEditable || savingPlanning}>
-                {savingPlanning ? 'Saving...' : 'Save planning'}
-              </Button>
-              <Button onClick={handleSubmitPlan} disabled={!isEditable || savingPlanning}>
-                {savingPlanning ? 'Submitting...' : 'Submit weekly plan'}
-              </Button>
-            </>
-          }
+          description={`Last submitted: ${formatDateTime(planningSubmittedAt)}`}
         >
           {loading ? (
             <p className="text-sm text-text-secondary">Loading planning...</p>
           ) : (
-            <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable || savingPlanning} />
+          <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable} />
           )}
         </SectionCard>
 
         <SectionCard
           title="Actual Output"
-          description={`Update the week output. Last updated: ${formatDateTime(actualUpdatedAt)}`}
+          description={`Last updated: ${formatDateTime(actualUpdatedAt)}`}
           actions={
             <Button onClick={handleSaveActual} disabled={!isEditable || savingActual}>
               {savingActual ? 'Saving...' : 'Save actual output'}

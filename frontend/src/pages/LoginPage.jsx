@@ -175,7 +175,7 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-6 flex min-h-[54px] justify-center">
-              <div ref={googleButtonRef} />
+              <div ref={googleButtonRef} className="google-signin-button" />
             </div>
 
             {!googleReady && googleClientId ? (

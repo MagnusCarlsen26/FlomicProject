@@ -1,4 +1,5 @@
 import { ApiError } from '../services/api'
+import { formatDateTime as formatDateTimeLabel, formatSheetDate as formatSheetDateLabel } from '../utils/dateFormat'
 
 export const POLL_INTERVAL_MS = 30000
 
@@ -14,40 +15,13 @@ export function getErrorMessage(error) {
   return 'Request failed'
 }
 
-export function formatDateTime(value) {
-  if (!value) {
-    return 'Not updated yet'
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return 'Invalid date'
-  }
-
-  return date.toLocaleString()
-}
+export const formatDateTime = formatDateTimeLabel
 
 export function formatPercent(value) {
   return `${((value || 0) * 100).toFixed(1)}%`
 }
 
-export function formatSheetDate(dateKey) {
-  if (!dateKey) {
-    return '-'
-  }
-
-  const date = new Date(`${dateKey}T00:00:00.000Z`)
-  if (Number.isNaN(date.getTime())) {
-    return dateKey
-  }
-
-  return date.toLocaleDateString(undefined, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+export const formatSheetDate = formatSheetDateLabel
 
 function getIsoWeekString(date) {
   const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))

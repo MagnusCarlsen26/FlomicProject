@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import FilterBar from '../components/layout/FilterBar'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
 import Alert from '../components/ui/Alert'
@@ -7,10 +6,9 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
-import Input from '../components/ui/Input'
 import { getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
-import { POLL_INTERVAL_MS, formatDateTime, formatSheetDate, getDefaultRangeWeeks, getErrorMessage } from './adminUtils'
+import { POLL_INTERVAL_MS, formatDateTime, formatSheetDate, getErrorMessage } from './adminUtils'
 
 function PlanningRowsTable({ rows }) {
   if (!rows?.length) {
@@ -85,8 +83,6 @@ function ActualOutputRowsTable({ rows }) {
 }
 
 export default function AdminSalesmenStatusPage() {
-  const defaultRange = useMemo(() => getDefaultRangeWeeks(), [])
-
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -96,13 +92,6 @@ export default function AdminSalesmenStatusPage() {
   const [weekInfo, setWeekInfo] = useState(null)
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const fetchCounterRef = useRef(0)
-
-  const [queryInput, setQueryInput] = useState('')
-  const [weekInput, setWeekInput] = useState(defaultRange.toWeek)
-  const [appliedFilters, setAppliedFilters] = useState(() => ({
-    query: '',
-    week: defaultRange.toWeek,
-  }))
 
   const fetchStatus = useCallback(
     async ({ silent = false, showSuccess = false } = {}) => {
@@ -116,10 +105,7 @@ export default function AdminSalesmenStatusPage() {
       }
 
       try {
-        const statusData = await getAdminSalesmenStatus({
-          q: appliedFilters.query || undefined,
-          week: appliedFilters.week || undefined,
-        })
+        const statusData = await getAdminSalesmenStatus()
 
         if (fetchId !== fetchCounterRef.current) {
           return
@@ -147,7 +133,7 @@ export default function AdminSalesmenStatusPage() {
         }
       }
     },
-    [appliedFilters],
+    [],
   )
 
   useEffect(() => {
@@ -182,7 +168,6 @@ export default function AdminSalesmenStatusPage() {
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Admin</p>
               <h1 className="mt-1 text-2xl font-bold text-text-primary">Salesmen Status</h1>
-              <p className="mt-1 text-sm text-text-secondary">Detailed planning and actual output by salesperson.</p>
             </div>
             <Button
               variant="secondary"
@@ -191,29 +176,6 @@ export default function AdminSalesmenStatusPage() {
             >
               {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-          </div>
-
-          <div className="mt-4">
-            <FilterBar className="md:grid-cols-3">
-              <Input
-                type="text"
-                placeholder="Search salesperson"
-                value={queryInput}
-                onChange={(event) => setQueryInput(event.target.value)}
-              />
-              <Input type="week" value={weekInput} onChange={(event) => setWeekInput(event.target.value)} />
-              <Button
-                onClick={() => {
-                  setAppliedFilters({
-                    query: queryInput.trim(),
-                    week: weekInput,
-                  })
-                }}
-                disabled={loading || isRefreshing}
-              >
-                {loading ? 'Loading...' : 'Apply filters'}
-              </Button>
-            </FilterBar>
           </div>
 
           <p className="mt-3 text-sm text-text-secondary">Showing {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}</p>
