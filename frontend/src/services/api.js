@@ -8,6 +8,21 @@ class ApiError extends Error {
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim()
+
+function buildApiUrl(path) {
+  if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  if (!API_BASE_URL) {
+    return path
+  }
+
+  const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${normalizedBaseUrl}${normalizedPath}`
+}
 
 async function parseResponseBody(response) {
   const contentType = response.headers.get('content-type') || ''
@@ -48,7 +63,7 @@ export async function apiFetch(path, options = {}) {
 
   let response
   try {
-    response = await fetch(path, {
+    response = await fetch(buildApiUrl(path), {
       ...options,
       headers,
       credentials: 'include',

@@ -23,14 +23,36 @@ function parseBoolean(value) {
   return undefined;
 }
 
+function parseSameSite(value) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === 'lax' || normalized === 'strict' || normalized === 'none') {
+    return normalized;
+  }
+
+  return undefined;
+}
+
 function getCookieBaseOptions() {
   const isProduction = process.env.NODE_ENV === 'production';
   const secureFromEnv = parseBoolean(process.env.SESSION_COOKIE_SECURE);
+  const sameSiteFromEnv = parseSameSite(process.env.SESSION_COOKIE_SAME_SITE);
+  const sameSite = sameSiteFromEnv || (isProduction ? 'none' : 'lax');
+  let secure = secureFromEnv ?? isProduction;
+
+  // Browsers reject SameSite=None cookies unless Secure=true.
+  if (sameSite === 'none' && !secure) {
+    secure = true;
+  }
 
   const options = {
     httpOnly: true,
-    secure: secureFromEnv ?? isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
+    secure,
+    sameSite,
     path: '/',
   };
 

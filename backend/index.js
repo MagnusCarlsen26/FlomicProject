@@ -3,7 +3,12 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { OAuth2Client } = require('google-auth-library');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const path = require('path');
+
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '.env') });
+}
 
 const User = require('./models/User');
 const WeeklyReport = require('./models/WeeklyReport');
@@ -24,24 +29,50 @@ const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client();
 
+function normalizeOrigin(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim().replace(/^['"]+|['"]+$/g, '');
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed === '*') {
+    return '*';
+  }
+
+  try {
+    return new URL(trimmed).origin;
+  } catch (_error) {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
+
+console.log('CORS allowed origins:', allowedOrigins);
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
       callback(null, true);
       return;
     }
 
-    callback(new Error('Origin is not allowed by CORS'));
+    callback(null, false);
   },
   credentials: true,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -249,6 +280,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(401).json({ message: 'Session user not found' });
     }
 
+    // Keep JWT claims in sync with current DB role/profile.
+    setSessionCookie(res, user);
     return res.status(200).json({ user: buildSafeUser(user), source: 'database' });
   } catch (error) {
     console.error('Session lookup error:', error);
@@ -502,20 +535,50 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port: ${PORT}`);
-});
+function normalizeMongoUri(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
 
-const mongoURI = process.env.MONGODB_URI;
-if (!mongoURI) {
-  console.warn('MONGODB_URI is not set. Skipping MongoDB connection.');
-} else {
-  mongoose
-    .connect(mongoURI)
-    .then(() => {
-      console.log('Connected to MongoDB successfully');
-    })
-    .catch((err) => {
-      console.error('MongoDB connection error:', err);
-    });
+  return value.trim().replace(/^['"]+|['"]+$/g, '');
 }
+
+function getMongoUriFromEnv() {
+  const rawValue = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.DATABASE_URL || '';
+  return normalizeMongoUri(rawValue);
+}
+
+async function startServer() {
+  const mongoURI = getMongoUriFromEnv();
+
+  if (!mongoURI) {
+    console.error(
+      'MongoDB connection skipped: set MONGODB_URI (or MONGO_URI / DATABASE_URL) in the runtime environment.'
+    );
+    process.exit(1);
+  }
+
+  mongoose.connection.on('error', (error) => {
+    console.error('MongoDB runtime error:', error);
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    console.error('MongoDB disconnected');
+  });
+
+  try {
+    await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 10000,
+    });
+    console.log('Connected to MongoDB successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port: ${PORT}`);
+  });
+}
+
+startServer();
