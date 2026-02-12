@@ -23,6 +23,18 @@ function ChartPanel({ title, children }) {
   )
 }
 
+function ChartGroup({ title, description, children }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+      <div>
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
 export default function InsightsCharts({ charts }) {
   const actualVsPlanned = (charts?.actualVsPlannedBySalesperson || []).filter(
     (row) => (row?.plannedVisits || 0) > 0 || (row?.actualVisits || 0) > 0,
@@ -33,78 +45,86 @@ export default function InsightsCharts({ charts }) {
   const productivityByWeekday = charts?.productivityByWeekday || []
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ChartPanel title="Actual vs Planned Visits by Salesperson">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={actualVsPlanned} layout="vertical" margin={{ top: 8, right: 8, left: 12, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="salesperson" width={160} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="plannedVisits" fill="#64748b" name="Planned" />
-              <Bar dataKey="actualVisits" fill="#0f766e" name="Actual" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
+    <div className="space-y-5">
+      <ChartGroup
+        title="Execution Tracking"
+        description="Monitor planned coverage against actual field activity and daily output rhythm."
+      >
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ChartPanel title="Actual vs Planned Visits by Salesperson">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={actualVsPlanned} layout="vertical" margin={{ top: 8, right: 8, left: 12, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="salesperson" width={160} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="plannedVisits" fill="#64748b" name="Planned" />
+                <Bar dataKey="actualVisits" fill="#0f766e" name="Actual" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartPanel>
 
-        <ChartPanel title="NC / FC / SC / JSV Distribution">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={contactDistribution} dataKey="count" nameKey="type" outerRadius={100} label>
-                {contactDistribution.map((entry, index) => (
-                  <Cell key={entry.type} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-      </div>
+          <ChartPanel title="Productivity by Day of Week">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={productivityByWeekday}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="enquiries" fill="#0369a1" name="Enquiries" />
+                <Bar dataKey="shipments" fill="#0f766e" name="Shipments" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartPanel>
+        </div>
+      </ChartGroup>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ChartPanel title="Conversion by Customer Type">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={conversionByCustomerType}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="customerType" />
-              <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(value * 100)}%`} />
-              <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
-              <Bar dataKey="conversionRate" fill="#1d4ed8" name="Conversion Rate" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
+      <ChartGroup
+        title="Conversion & Mix"
+        description="Compare conversion quality across channels while tracking contact type distribution."
+      >
+        <div className="grid gap-4 xl:grid-cols-3">
+          <ChartPanel title="Conversion by Customer Type">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={conversionByCustomerType}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="customerType" />
+                <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(value * 100)}%`} />
+                <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
+                <Bar dataKey="conversionRate" fill="#1d4ed8" name="Conversion Rate" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartPanel>
 
-        <ChartPanel title="Conversion by Visit Type">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={conversionByVisitType}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="visitType" />
-              <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(value * 100)}%`} />
-              <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
-              <Bar dataKey="conversionRate" fill="#7c3aed" name="Conversion Rate" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-      </div>
+          <ChartPanel title="Conversion by Visit Type">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={conversionByVisitType}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="visitType" />
+                <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(value * 100)}%`} />
+                <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
+                <Bar dataKey="conversionRate" fill="#7c3aed" name="Conversion Rate" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartPanel>
 
-      <div className="grid gap-4">
-        <ChartPanel title="Productivity by Day of Week">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={productivityByWeekday}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="enquiries" fill="#0369a1" name="Enquiries" />
-              <Bar dataKey="shipments" fill="#0f766e" name="Shipments" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-      </div>
+          <ChartPanel title="NC / FC / SC / JSV Distribution">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={contactDistribution} dataKey="count" nameKey="type" outerRadius={100} label>
+                  {contactDistribution.map((entry, index) => (
+                    <Cell key={entry.type} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartPanel>
+        </div>
+      </ChartGroup>
     </div>
   )
 }

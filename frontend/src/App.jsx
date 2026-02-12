@@ -1,9 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/useAuth'
-import AdminPage from './pages/AdminPage'
 import LoginPage from './pages/LoginPage'
 import SalesmanPage from './pages/SalesmanPage'
+import AdminInsightsPage from './pages/AdminInsightsPage'
+import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
 
 function LoadingScreen() {
   return (
@@ -27,7 +28,7 @@ function RoleHomeRedirect() {
     return <Navigate to="/login" replace />
   }
 
-  return <Navigate to={user.role === 'admin' ? '/admin' : '/salesman'} replace />
+  return <Navigate to={user.role === 'admin' ? '/admin/insights' : '/salesman'} replace />
 }
 
 function LoginRoute() {
@@ -38,7 +39,7 @@ function LoginRoute() {
   }
 
   if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/salesman'} replace />
+    return <Navigate to={user.role === 'admin' ? '/admin/insights' : '/salesman'} replace />
   }
 
   return <LoginPage />
@@ -55,7 +56,9 @@ export default function App() {
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin" element={<Navigate to="/admin/insights" replace />} />
+        <Route path="/admin/insights" element={<AdminInsightsPage />} />
+        <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
