@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import SalesmanPage from './pages/SalesmanPage'
 import AdminInsightsPage from './pages/AdminInsightsPage'
 import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
+import { getDefaultRoute } from './utils/roles'
 
 function LoadingScreen() {
   return (
@@ -32,7 +33,7 @@ function RoleHomeRedirect() {
     return <Navigate to="/login" replace />
   }
 
-  return <Navigate to={user.role === 'admin' ? '/admin/insights' : '/salesman'} replace />
+  return <Navigate to={getDefaultRoute(user)} replace />
 }
 
 function LoginRoute() {
@@ -43,7 +44,7 @@ function LoginRoute() {
   }
 
   if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin/insights' : '/salesman'} replace />
+    return <Navigate to={getDefaultRoute(user)} replace />
   }
 
   return <LoginPage />

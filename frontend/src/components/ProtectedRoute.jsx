@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import { getDefaultRoute, hasAnyRole } from '../utils/roles'
 
 function FullPageMessage({ title, subtitle }) {
   return (
@@ -24,9 +25,8 @@ export default function ProtectedRoute({ allowedRoles = [], children }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    const fallbackPath = user.role === 'admin' ? '/admin/insights' : '/salesman'
-    return <Navigate to={fallbackPath} replace />
+  if (!hasAnyRole(user, allowedRoles)) {
+    return <Navigate to={getDefaultRoute(user)} replace />
   }
 
   return children || <Outlet />

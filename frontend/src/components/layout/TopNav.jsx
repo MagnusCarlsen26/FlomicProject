@@ -1,18 +1,23 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 import { useTheme } from '../../context/useTheme'
+import { hasRole } from '../../utils/roles'
 import Button from '../ui/Button'
 import { cn } from '../ui/cn'
 
-function getNavItems(role) {
-  if (role === 'admin') {
-    return [
-      { to: '/admin/insights', label: 'Insights' },
-      { to: '/admin/salesmen-status', label: 'Salesmen Status' },
-    ]
+function getNavItems(user) {
+  const items = []
+
+  if (hasRole(user, 'salesman')) {
+    items.push({ to: '/salesman', label: 'Workspace' })
   }
 
-  return [{ to: '/salesman', label: 'Workspace' }]
+  if (hasRole(user, 'admin')) {
+    items.push({ to: '/admin/insights', label: 'Insights' })
+    items.push({ to: '/admin/salesmen-status', label: 'Salesmen Status' })
+  }
+
+  return items
 }
 
 export default function TopNav() {
@@ -21,7 +26,7 @@ export default function TopNav() {
   const location = useLocation()
   const hideSalesmanNav = location.pathname === '/salesman'
   const hideInsightsUserInfo = location.pathname === '/admin/insights'
-  const navItems = getNavItems(user?.role)
+  const navItems = getNavItems(user)
 
   if (hideSalesmanNav) {
     return (
