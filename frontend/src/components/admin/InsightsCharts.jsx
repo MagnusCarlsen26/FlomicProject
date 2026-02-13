@@ -59,21 +59,7 @@ export default function InsightsCharts({ charts }) {
   return (
     <div className="space-y-5">
       <ChartGroup title="Execution Tracking">
-        <div className="grid gap-4 xl:grid-cols-2">
-          <ChartPanel title="Actual vs Planned Visits by Salesperson">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={actualVsPlanned} layout="vertical" margin={{ top: 8, right: 8, left: 12, bottom: 8 }}>
-                <CartesianGrid stroke={chartTheme.grid} strokeDasharray="3 3" />
-                <XAxis type="number" allowDecimals={false} tick={{ fill: chartTheme.axis }} />
-                <YAxis type="category" dataKey="salesperson" width={160} tick={{ fill: chartTheme.axis }} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
-                <Bar dataKey="plannedVisits" fill={chartTheme.planned} name="Planned" />
-                <Bar dataKey="actualVisits" fill={chartTheme.actual} name="Actual" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartPanel>
-
+        <div className="grid gap-4">
           <ChartPanel title="Productivity by Day of Week">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={productivityByWeekday}>

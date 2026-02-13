@@ -183,7 +183,7 @@ export default function AdminInsightsPage() {
 
           <GlassCard className="space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Productivity Tables</h3>
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="flex flex-col gap-6">
               <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
                 <h4 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Geographic Productivity</h4>
                 <LocationProductivityTable rows={insights?.tables?.locationProductivity} />

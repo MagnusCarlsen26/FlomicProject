@@ -340,6 +340,7 @@ export default function SalesmanPage() {
   const [actualUpdatedAt, setActualUpdatedAt] = useState(null)
 
   const [savingActual, setSavingActual] = useState(false)
+  const [savingPlanning, setSavingPlanning] = useState(false)
 
   const loadCurrentWeek = useCallback(async () => {
     setLoading(true)
@@ -366,6 +367,28 @@ export default function SalesmanPage() {
   }, [loadCurrentWeek])
 
   const isEditable = week?.isEditable !== false
+
+  const handleSavePlanning = useCallback(async () => {
+    if (!week?.key) {
+      return
+    }
+
+    setSavingPlanning(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const data = await updateSalesmanPlanning({ weekKey: week.key, rows: planningRows })
+      setPlanningRows(data?.planning?.rows || [])
+      setPlanningSubmittedAt(data?.planning?.submittedAt || null)
+      setSuccessMessage('Planning saved successfully.')
+    } catch (e) {
+      setError(getErrorMessage(e))
+    } finally {
+      setSavingPlanning(false)
+    }
+  }, [planningRows, week?.key])
+
   const handleSaveActual = useCallback(async () => {
     if (!week?.key) {
       return
@@ -404,11 +427,16 @@ export default function SalesmanPage() {
         <SectionCard
           title="Planning"
           description={`Last submitted: ${formatDateTime(planningSubmittedAt)}`}
+          actions={
+            <Button onClick={handleSavePlanning} disabled={!isEditable || savingPlanning}>
+              {savingPlanning ? 'Saving...' : 'Save planning'}
+            </Button>
+          }
         >
           {loading ? (
             <p className="text-sm text-text-secondary">Loading planning...</p>
           ) : (
-          <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable} />
+            <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable || savingPlanning} />
           )}
         </SectionCard>
 
