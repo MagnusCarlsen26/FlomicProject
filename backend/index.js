@@ -516,6 +516,8 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
         };
       });
 
+
+
     return res.status(200).json({
       week: {
         key: week.key,
@@ -536,12 +538,41 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
   }
 });
 
+app.get('/api/admin/salesmen', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  try {
+    const salesmen = await User.find({ role: { $in: ['salesman', 'admin'] } })
+      .select('_id name email picture role')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    return res.status(200).json({
+      total: salesmen.length,
+      salesmen: salesmen.map((s) => ({
+        id: String(s._id),
+        name: s.name || '',
+        email: s.email,
+        picture: s.picture || '',
+        role: s.role,
+      })),
+    });
+  } catch (error) {
+    console.error('Fetch salesmen error:', error);
+    return res.status(500).json({ message: 'Unable to fetch salesmen' });
+  }
+});
+
 app.get('/api/admin/insights', requireAuth, requireRole('admin'), async (req, res) => {
   if (!hasDbConnection()) {
     return res.status(503).json({ message: 'Database is not connected' });
   }
 
   const q = String(req.query?.q || '').trim();
+  const salesmenIds = String(req.query?.salesmen || '').trim().split(',').filter(Boolean);
+
   const rangeResult = resolveInsightsRange({
     from: req.query?.from,
     to: req.query?.to,
@@ -553,7 +584,9 @@ app.get('/api/admin/insights', requireAuth, requireRole('admin'), async (req, re
 
   const salesmanQuery = { role: { $in: ['salesman', 'admin'] } };
 
-  if (q) {
+  if (salesmenIds.length > 0) {
+    salesmanQuery._id = { $in: salesmenIds };
+  } else if (q) {
     const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escapedQ, 'i');
     salesmanQuery.$or = [{ name: regex }, { email: regex }];

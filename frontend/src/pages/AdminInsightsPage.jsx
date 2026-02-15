@@ -10,8 +10,10 @@ import SalespersonProductivityTable from '../components/admin/SalespersonProduct
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import GlassCard from '../components/ui/GlassCard'
+import Input from '../components/ui/Input'
+import MultiSelect from '../components/ui/MultiSelect'
 import { useAuth } from '../context/useAuth'
-import { getAdminInsights } from '../services/api'
+import { getAdminInsights, getAdminSalesmen } from '../services/api'
 import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
 
 export default function AdminInsightsPage() {
@@ -23,10 +25,18 @@ export default function AdminInsightsPage() {
   const [successMessage, setSuccessMessage] = useState(null)
   const [insights, setInsights] = useState(null)
   const [lastPolledAt, setLastPolledAt] = useState(null)
+  
+  // Filter States
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [selectedSalesmen, setSelectedSalesmen] = useState([])
+  const [salesmenOptions, setSalesmenOptions] = useState([])
+  const [appliedFilters, setAppliedFilters] = useState({ from: '', to: '', salesmen: [] })
+
   const fetchCounterRef = useRef(0)
 
   const fetchInsights = useCallback(
-    async ({ silent = false, showSuccess = false } = {}) => {
+    async ({ silent = false, showSuccess = false, filters = appliedFilters } = {}) => {
       const fetchId = fetchCounterRef.current + 1
       fetchCounterRef.current = fetchId
 
@@ -37,7 +47,11 @@ export default function AdminInsightsPage() {
       }
 
       try {
-        const insightsData = await getAdminInsights()
+        const insightsData = await getAdminInsights({
+          from: filters.from || undefined,
+          to: filters.to || undefined,
+          salesmen: filters.salesmen.length > 0 ? filters.salesmen : undefined
+        })
 
         if (fetchId !== fetchCounterRef.current) {
           return
@@ -63,8 +77,21 @@ export default function AdminInsightsPage() {
         }
       }
     },
-    [],
+    [appliedFilters],
   )
+
+  const fetchSalesmen = useCallback(async () => {
+    try {
+      const data = await getAdminSalesmen()
+      setSalesmenOptions(data.salesmen || [])
+    } catch (e) {
+      console.error('Failed to fetch salesmen', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchSalesmen()
+  }, [fetchSalesmen])
 
   useEffect(() => {
     fetchInsights()
@@ -90,6 +117,24 @@ export default function AdminInsightsPage() {
     }
   }, [fetchInsights])
 
+  const handleApplyFilters = () => {
+    const newFilters = {
+      from: fromDate,
+      to: toDate,
+      salesmen: selectedSalesmen
+    }
+    setAppliedFilters(newFilters)
+    setSuccessMessage('Filters applied.')
+    setTimeout(() => setSuccessMessage(null), 3000)
+  }
+
+  const handleResetFilters = () => {
+    setFromDate('')
+    setToDate('')
+    setSelectedSalesmen([])
+    setAppliedFilters({ from: '', to: '', salesmen: [] })
+  }
+
   const headerSubtitle = useMemo(() => {
     if (!insights?.range) {
       return 'Read-only dashboard'
@@ -101,23 +146,57 @@ export default function AdminInsightsPage() {
   return (
     <PageEnter>
       <PageSurface>
-        <GlassCard>
+        <GlassCard className="relative z-30">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Admin</p>
               <h1 className="mt-1 text-2xl font-bold text-text-primary">Insights</h1>
               <p className="mt-1 text-sm text-text-secondary">{headerSubtitle}</p>
             </div>
-            <Button
-              variant="secondary"
-              onClick={() => fetchInsights({ showSuccess: true })}
-              disabled={loading || isRefreshing}
-            >
-              {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => fetchInsights({ showSuccess: true })}
+                disabled={loading || isRefreshing}
+              >
+                {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </div>
           </div>
 
           <p className="mt-3 text-sm text-text-secondary">Last refresh: {formatDateTime(lastPolledAt)}</p>
+
+          <div className="relative z-20 mt-6 grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface/50 p-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">From Date</label>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">To Date</label>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Salesmen</label>
+              <MultiSelect
+                options={salesmenOptions}
+                selected={selectedSalesmen}
+                onChange={setSelectedSalesmen}
+                placeholder="All Salesmen"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleApplyFilters} className="flex-1">Apply</Button>
+              <Button variant="secondary" onClick={handleResetFilters}>Reset</Button>
+            </div>
+          </div>
 
           <div className="mt-4 space-y-3">
             {error ? <Alert tone="error">{error}</Alert> : null}
@@ -126,7 +205,6 @@ export default function AdminInsightsPage() {
         </GlassCard>
 
         <section className="space-y-5">
-
           <GlassCard className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Execution</h3>
