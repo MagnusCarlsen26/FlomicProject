@@ -95,6 +95,44 @@ function hasDbConnection() {
   return mongoose.connection?.readyState === 1;
 }
 
+async function listAdminUsers() {
+  const admins = await User.find({ role: 'admin' })
+    .select('_id name email')
+    .sort({ name: 1, email: 1 })
+    .lean();
+
+  return admins.map((admin) => ({
+    id: String(admin._id),
+    name: admin.name || '',
+    email: admin.email,
+  }));
+}
+
+function toExistingRowsByDate(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const date = String(row?.date || '');
+    if (date) {
+      map.set(date, row);
+    }
+  }
+  return map;
+}
+
+function mapPlanningRowsForDisplay(rows, adminLabelById) {
+  return (rows || []).map((row) => {
+    const rawValue = String(row?.jsvWithWhom || '').trim();
+    if (!rawValue || !adminLabelById.has(rawValue)) {
+      return row;
+    }
+
+    return {
+      ...row,
+      jsvWithWhom: adminLabelById.get(rawValue),
+    };
+  });
+}
+
 async function getOrCreateCurrentWeekReport(salesmanId) {
   const week = getWeekParts();
   let report = await WeeklyReport.findOne({ salesmanId, weekKey: week.key });
@@ -122,7 +160,7 @@ async function getOrCreateCurrentWeekReport(salesmanId) {
   return { report, week };
 }
 
-function buildSalesmanWeekResponse(report, week) {
+function buildSalesmanWeekResponse(report, week, jsvAdminUsers = []) {
   return {
     week: {
       key: week.key,
@@ -144,6 +182,7 @@ function buildSalesmanWeekResponse(report, week) {
       note: report.statusNote || '',
       updatedAt: report.statusUpdatedAt || null,
     },
+    jsvAdminUsers,
   };
 }
 
@@ -302,7 +341,8 @@ app.get('/api/salesman/current-week', requireAuth, requireRole('salesman', 'admi
 
   try {
     const { report, week } = await getOrCreateCurrentWeekReport(req.auth.userId);
-    return res.status(200).json(buildSalesmanWeekResponse(report, week));
+    const jsvAdminUsers = await listAdminUsers();
+    return res.status(200).json(buildSalesmanWeekResponse(report, week, jsvAdminUsers));
   } catch (error) {
     console.error('Current week fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch current week data' });
@@ -323,13 +363,18 @@ app.put('/api/salesman/planning', requireAuth, requireRole('salesman', 'admin'),
     });
   }
 
-  const normalizedResult = normalizePlanningRows(rows, currentWeek);
-  if (normalizedResult.error) {
-    return res.status(400).json({ message: normalizedResult.error });
-  }
-
   try {
     const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    const jsvAdminUsers = await listAdminUsers();
+    const normalizedResult = normalizePlanningRows(rows, currentWeek, {
+      allowedAdminIds: new Set(jsvAdminUsers.map((admin) => admin.id)),
+      existingRowsByDate: toExistingRowsByDate(report.planningRows || []),
+      allowLegacyUnchanged: true,
+    });
+    if (normalizedResult.error) {
+      return res.status(400).json({ message: normalizedResult.error });
+    }
+
     report.planningRows = normalizedResult.rows;
 
     if (submitted === true) {
@@ -460,6 +505,11 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
   }
 
   try {
+    const adminUsers = await listAdminUsers();
+    const adminLabelById = new Map(
+      adminUsers.map((admin) => [admin.id, admin.name || admin.email])
+    );
+
     const salesmen = await User.find(salesmanQuery)
       .select('_id name email picture role')
       .sort({ name: 1, email: 1 })
@@ -505,7 +555,7 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
             role: salesman.role,
           },
           planning: {
-            rows: report?.planningRows || [],
+            rows: mapPlanningRowsForDisplay(report?.planningRows || [], adminLabelById),
             submittedAt: report?.planningSubmittedAt || null,
           },
           actualOutput: {

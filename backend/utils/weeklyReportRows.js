@@ -81,7 +81,12 @@ function parseNonNegativeInteger(rawValue, label) {
   return { value };
 }
 
-function normalizePlanningRows(rows, week) {
+function normalizePlanningRows(rows, week, options = {}) {
+  const {
+    allowedAdminIds = null,
+    existingRowsByDate = null,
+    allowLegacyUnchanged = false,
+  } = options;
   const envelopeError = validateRowsEnvelope(rows, 'planning.rows');
   if (envelopeError) {
     return { error: envelopeError };
@@ -131,6 +136,25 @@ function normalizePlanningRows(rows, week) {
 
     if (contactType !== 'jsv') {
       normalizedRow.jsvWithWhom = '';
+    } else if (normalizedRow.jsvWithWhom) {
+      const isAllowedAdminId =
+        allowedAdminIds instanceof Set && allowedAdminIds.has(normalizedRow.jsvWithWhom);
+
+      if (!isAllowedAdminId) {
+        const existingRow =
+          existingRowsByDate instanceof Map ? existingRowsByDate.get(date) : null;
+        const existingValue = String(existingRow?.jsvWithWhom || '').trim();
+        const isUnchangedLegacy =
+          allowLegacyUnchanged === true &&
+          existingValue &&
+          existingValue === normalizedRow.jsvWithWhom;
+
+        if (!isUnchangedLegacy) {
+          return {
+            error: `planning.rows[${index}].jsvWithWhom must reference an admin user`,
+          };
+        }
+      }
     }
 
     normalizedByDate.set(date, normalizedRow);

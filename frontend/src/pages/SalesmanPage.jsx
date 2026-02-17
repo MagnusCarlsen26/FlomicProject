@@ -64,7 +64,12 @@ function SectionCard({ title, description, actions, children }) {
   )
 }
 
-const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled }) {
+const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled, jsvAdminUsers }) {
+  const normalizedAdmins = Array.isArray(jsvAdminUsers) ? jsvAdminUsers : []
+  const adminIds = new Set(normalizedAdmins.map((admin) => admin.id))
+  const selectedJsvValue = row.jsvWithWhom || ''
+  const hasLegacyValue = selectedJsvValue && !adminIds.has(selectedJsvValue)
+
   return (
     <tr>
       <td>{row.isoWeek ?? '-'}</td>
@@ -112,18 +117,27 @@ const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled 
         </Select>
       </td>
       <td>
-        <Input
-          type="text"
-          value={row.jsvWithWhom || ''}
+        <Select
+          value={selectedJsvValue}
           onChange={(event) => updateRow(index, 'jsvWithWhom', event.target.value)}
           disabled={disabled || row.contactType !== 'jsv'}
-        />
+        >
+          <option value="">Select admin</option>
+          {hasLegacyValue ? (
+            <option value={selectedJsvValue}>{`Legacy (unchanged): ${selectedJsvValue}`}</option>
+          ) : null}
+          {normalizedAdmins.map((admin) => (
+            <option key={admin.id} value={admin.id}>
+              {admin.name || admin.email}
+            </option>
+          ))}
+        </Select>
       </td>
     </tr>
   )
 })
 
-function PlanningTableEditor({ rows, setRows, disabled }) {
+function PlanningTableEditor({ rows, setRows, disabled, jsvAdminUsers }) {
   const updateRow = useCallback(
     (index, field, value) => {
       setRows((prevRows) =>
@@ -164,7 +178,14 @@ function PlanningTableEditor({ rows, setRows, disabled }) {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <PlanningRow key={row.date || `planning-row-${index}`} row={row} index={index} updateRow={updateRow} disabled={disabled} />
+            <PlanningRow
+              key={row.date || `planning-row-${index}`}
+              row={row}
+              index={index}
+              updateRow={updateRow}
+              disabled={disabled}
+              jsvAdminUsers={jsvAdminUsers}
+            />
           ))}
         </tbody>
       </table>
@@ -338,6 +359,7 @@ export default function SalesmanPage() {
   const [actualRows, setActualRows] = useState([])
   const [planningSubmittedAt, setPlanningSubmittedAt] = useState(null)
   const [actualUpdatedAt, setActualUpdatedAt] = useState(null)
+  const [jsvAdminUsers, setJsvAdminUsers] = useState([])
 
   const [savingActual, setSavingActual] = useState(false)
   const [savingPlanning, setSavingPlanning] = useState(false)
@@ -353,6 +375,7 @@ export default function SalesmanPage() {
       setActualRows(data?.actualOutput?.rows || [])
       setPlanningSubmittedAt(data?.planning?.submittedAt || null)
       setActualUpdatedAt(data?.actualOutput?.updatedAt || null)
+      setJsvAdminUsers(data?.jsvAdminUsers || [])
       setSuccessMessage(null)
     } catch (e) {
       setSuccessMessage(null)
@@ -436,7 +459,12 @@ export default function SalesmanPage() {
           {loading ? (
             <p className="text-sm text-text-secondary">Loading planning...</p>
           ) : (
-            <PlanningTableEditor rows={planningRows} setRows={setPlanningRows} disabled={!isEditable || savingPlanning} />
+            <PlanningTableEditor
+              rows={planningRows}
+              setRows={setPlanningRows}
+              disabled={!isEditable || savingPlanning}
+              jsvAdminUsers={jsvAdminUsers}
+            />
           )}
         </SectionCard>
 
