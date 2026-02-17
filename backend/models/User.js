@@ -31,6 +31,24 @@ const userSchema = new mongoose.Schema(
       default: 'salesman',
       index: true,
     },
+    mainTeam: {
+      type: String,
+      default: 'Unassigned',
+      trim: true,
+      index: true,
+    },
+    team: {
+      type: String,
+      default: 'Unassigned',
+      trim: true,
+      index: true,
+    },
+    subTeam: {
+      type: String,
+      default: 'Unassigned',
+      trim: true,
+      index: true,
+    },
   },
   {
     timestamps: true,

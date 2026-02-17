@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import SalesmanPage from './pages/SalesmanPage'
 import AdminInsightsPage from './pages/AdminInsightsPage'
 import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
+import AdminStage1PlanActualPage from './pages/AdminStage1PlanActualPage'
 import { getDefaultRoute } from './utils/roles'
 
 function LoadingScreen() {
@@ -64,7 +65,8 @@ export default function App() {
 
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route element={<AppShell />}>
-          <Route path="/admin" element={<Navigate to="/admin/insights" replace />} />
+          <Route path="/admin" element={<Navigate to="/admin/stage1-plan-actual" replace />} />
+          <Route path="/admin/stage1-plan-actual" element={<AdminStage1PlanActualPage />} />
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
         </Route>

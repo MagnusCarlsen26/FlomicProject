@@ -12,6 +12,9 @@ function getTabClassName({ isActive }) {
 export default function AdminSectionTabs() {
   return (
     <nav className="flex flex-wrap gap-2">
+      <NavLink to="/admin/stage1-plan-actual" className={getTabClassName}>
+        Stage 1
+      </NavLink>
       <NavLink to="/admin/insights" className={getTabClassName}>
         Insights
       </NavLink>

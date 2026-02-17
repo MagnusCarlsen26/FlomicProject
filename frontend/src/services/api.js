@@ -199,4 +199,57 @@ export async function getAdminInsights({ from, to, q, salesmen } = {}) {
   return apiFetch(`/api/admin/insights${suffix}`)
 }
 
+export async function getAdminStage1PlanActual({
+  from,
+  to,
+  week,
+  month,
+  q,
+  salesmen,
+  callType,
+  customerType,
+  mainTeam,
+  team,
+  subTeam,
+} = {}) {
+  const params = new URLSearchParams()
+
+  if (from) {
+    params.set('from', from)
+  }
+  if (to) {
+    params.set('to', to)
+  }
+  if (week) {
+    params.set('week', week)
+  }
+  if (month) {
+    params.set('month', month)
+  }
+  if (q) {
+    params.set('q', q)
+  }
+  if (salesmen && salesmen.length > 0) {
+    params.set('salesmen', Array.isArray(salesmen) ? salesmen.join(',') : salesmen)
+  }
+  if (callType) {
+    params.set('callType', callType)
+  }
+  if (customerType) {
+    params.set('customerType', customerType)
+  }
+  if (mainTeam) {
+    params.set('mainTeam', mainTeam)
+  }
+  if (team) {
+    params.set('team', team)
+  }
+  if (subTeam) {
+    params.set('subTeam', subTeam)
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/stage1-plan-actual${suffix}`)
+}
+
 export { ApiError }

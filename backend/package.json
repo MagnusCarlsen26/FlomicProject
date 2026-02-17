@@ -7,7 +7,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "node --test",
-    "seed:jsv-alerts": "node scripts/seed_jsv_repeat_alerts_for_5_users.js"
+    "seed:jsv-alerts": "node scripts/seed_jsv_repeat_alerts_for_5_users.js",
+    "backfill:hierarchy": "node scripts/backfill_user_hierarchy.js"
   },
   "keywords": [],
   "author": "",

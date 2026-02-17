@@ -17,6 +17,7 @@ const { requireAuth, requireRole } = require('./middleware/auth');
 const { clearSessionCookie, setSessionCookie } = require('./utils/session');
 const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
 const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminInsights');
+const { buildStage1Payload, resolveStage1Range } = require('./utils/stage1PlanActual');
 const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
@@ -91,6 +92,9 @@ function buildSafeUser(user, options = {}) {
     name: user.name || '',
     role: user.role,
     picture: user.picture || '',
+    mainTeam: user.mainTeam || 'Unassigned',
+    team: user.team || 'Unassigned',
+    subTeam: user.subTeam || 'Unassigned',
     jsvRepeatAlert: options.jsvRepeatAlert || buildInactiveAlert(threshold),
   };
 }
@@ -311,6 +315,9 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     name: req.auth.name || '',
     role: req.auth.role || 'salesman',
     picture: '',
+    mainTeam: 'Unassigned',
+    team: 'Unassigned',
+    subTeam: 'Unassigned',
     jsvRepeatAlert: buildInactiveAlert(threshold),
   };
 
@@ -710,6 +717,78 @@ app.get('/api/admin/insights', requireAuth, requireRole('admin'), async (req, re
   } catch (error) {
     console.error('Admin insights fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch admin insights data' });
+  }
+});
+
+app.get('/api/admin/stage1-plan-actual', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const rangeResult = resolveStage1Range(req.query || {});
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const salesmen = String(req.query?.salesmen || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const callType = String(req.query?.callType || '').trim().toLowerCase();
+  const customerType = String(req.query?.customerType || '').trim().toLowerCase();
+  const mainTeam = String(req.query?.mainTeam || '').trim();
+  const team = String(req.query?.team || '').trim();
+  const subTeam = String(req.query?.subTeam || '').trim();
+  const q = String(req.query?.q || '').trim();
+
+  try {
+    const userQuery = { role: { $in: ['salesman', 'admin'] } };
+    if (q) {
+      const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedQ, 'i');
+      userQuery.$or = [{ name: regex }, { email: regex }];
+    }
+
+    const users = await User.find(userQuery)
+      .select('_id name email mainTeam team subTeam')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    const userIds = users.map((user) => user._id);
+    const rangeWeekStart = resolveWeekFromQuery(rangeResult.fromDate);
+    const rangeWeekEnd = resolveWeekFromQuery(rangeResult.toDate);
+
+    const reports =
+      userIds.length === 0
+        ? []
+        : await WeeklyReport.find({
+            salesmanId: { $in: userIds },
+            weekStartDateUtc: {
+              $gte: rangeWeekStart.weekStartDateUtc,
+              $lte: rangeWeekEnd.weekStartDateUtc,
+            },
+          })
+            .select('salesmanId planningRows actualOutputRows weekKey')
+            .lean();
+
+    const payload = buildStage1Payload({
+      users,
+      reports,
+      range: rangeResult,
+      filters: {
+        salesmen,
+        callType,
+        customerType,
+        mainTeam,
+        team,
+        subTeam,
+      },
+    });
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('Stage 1 plan-vs-actual fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch stage 1 plan-vs-actual data' });
   }
 });
 
