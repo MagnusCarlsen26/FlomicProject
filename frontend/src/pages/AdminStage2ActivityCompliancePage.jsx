@@ -9,7 +9,7 @@ import Input from '../components/ui/Input'
 import InsightCard from '../components/admin/InsightCard'
 import MultiSelect from '../components/ui/MultiSelect'
 import { getAdminStage2ActivityCompliance } from '../services/api'
-import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
+import { POLL_INTERVAL_MS, formatDateTime, getErrorMessage } from './adminUtils'
 
 function StatusChip({ severity }) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-bold uppercase'

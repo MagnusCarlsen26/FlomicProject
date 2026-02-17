@@ -285,6 +285,41 @@ export async function getAdminStage2ActivityCompliance({
   return apiFetch(`/api/admin/stage2-activity-compliance${suffix}`)
 }
 
+export async function getAdminStage4EnquiryEffectiveness({
+  from,
+  to,
+  salesmen,
+  team,
+  visitType,
+  customerType,
+  location,
+  admin,
+  minVisitsForLowEnquiry,
+  minEnquiryPerVisit,
+  minEnquiriesForLowConversion,
+  minShipmentConversion,
+} = {}) {
+  const params = new URLSearchParams()
+
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (salesmen && salesmen.length > 0) {
+    params.set('salesmen', Array.isArray(salesmen) ? salesmen.join(',') : salesmen)
+  }
+  if (team) params.set('team', team)
+  if (visitType) params.set('visitType', visitType)
+  if (customerType) params.set('customerType', customerType)
+  if (location) params.set('location', location)
+  if (admin) params.set('admin', admin)
+  if (minVisitsForLowEnquiry !== undefined) params.set('minVisitsForLowEnquiry', String(minVisitsForLowEnquiry))
+  if (minEnquiryPerVisit !== undefined) params.set('minEnquiryPerVisit', String(minEnquiryPerVisit))
+  if (minEnquiriesForLowConversion !== undefined) params.set('minEnquiriesForLowConversion', String(minEnquiriesForLowConversion))
+  if (minShipmentConversion !== undefined) params.set('minShipmentConversion', String(minShipmentConversion))
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/stage4-enquiry-effectiveness${suffix}`)
+}
+
 export async function getAdminStage3PlannedNotVisited({
   from,
   to,

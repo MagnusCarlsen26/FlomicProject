@@ -20,6 +20,7 @@ const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminIns
 const { buildStage1Payload, resolveStage1Range } = require('./utils/stage1PlanActual');
 const { buildStage2Payload, resolveStage2Range } = require('./utils/stage2ActivityCompliance');
 const { buildStage3Payload, resolveStage3Range } = require('./utils/stage3PlannedNotVisited');
+const { buildStage4Payload, resolveStage4Range, DEFAULT_THRESHOLDS } = require('./utils/stage4EnquiryEffectiveness');
 const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
@@ -536,6 +537,86 @@ app.get('/api/admin/stage3-planned-not-visited', requireAuth, requireRole('admin
   } catch (error) {
     console.error('Stage 3 planned-not-visited fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch stage 3 data' });
+  }
+});
+
+app.get('/api/admin/stage4-enquiry-effectiveness', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const rangeResult = resolveStage4Range(req.query || {});
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const salesmen = String(req.query?.salesmen || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const team = String(req.query?.team || '').trim();
+  const visitType = String(req.query?.visitType || '').trim().toLowerCase();
+  const customerType = String(req.query?.customerType || '').trim().toLowerCase();
+  const location = String(req.query?.location || '').trim();
+  const admin = String(req.query?.admin || '').trim();
+
+  const thresholds = {
+    minVisitsForLowEnquiry: req.query?.minVisitsForLowEnquiry,
+    minEnquiryPerVisit: req.query?.minEnquiryPerVisit,
+    minEnquiriesForLowConversion: req.query?.minEnquiriesForLowConversion,
+    minShipmentConversion: req.query?.minShipmentConversion,
+  };
+
+  try {
+    const userQuery = { role: { $in: ['salesman', 'admin'] } };
+    if (salesmen.length > 0) {
+      userQuery._id = { $in: salesmen };
+    }
+    if (team) {
+      userQuery.team = team;
+    }
+
+    const users = await User.find(userQuery)
+      .select('_id name email role team')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    const userIds = users.map((user) => user._id);
+    const reports =
+      userIds.length === 0
+        ? []
+        : await WeeklyReport.find({
+            salesmanId: { $in: userIds },
+            weekStartDateUtc: {
+              $gte: rangeResult.fromWeek.weekStartDateUtc,
+              $lte: rangeResult.toWeek.weekStartDateUtc,
+            },
+          })
+            .select('salesmanId planningRows actualOutputRows weekKey')
+            .lean();
+
+    const payload = buildStage4Payload({
+      users,
+      reports,
+      range: rangeResult,
+      filters: {
+        salesmen,
+        team,
+        visitType,
+        customerType,
+        location,
+        admin,
+      },
+      thresholds,
+    });
+
+    // Include defaults so frontend can render placeholders and reset values reliably.
+    payload.thresholdDefaults = DEFAULT_THRESHOLDS;
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('Stage 4 enquiry effectiveness fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch stage 4 data' });
   }
 });
 

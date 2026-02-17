@@ -10,6 +10,7 @@ import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
 import AdminStage1PlanActualPage from './pages/AdminStage1PlanActualPage'
 import AdminStage2ActivityCompliancePage from './pages/AdminStage2ActivityCompliancePage'
 import AdminStage3PlannedNotVisitedPage from './pages/AdminStage3PlannedNotVisitedPage'
+import AdminStage4EnquiryEffectivenessPage from './pages/AdminStage4EnquiryEffectivenessPage'
 import { getDefaultRoute } from './utils/roles'
 
 function LoadingScreen() {
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/admin/stage1-plan-actual" element={<AdminStage1PlanActualPage />} />
           <Route path="/admin/stage2-activity-compliance" element={<AdminStage2ActivityCompliancePage />} />
           <Route path="/admin/stage3-planned-not-visited" element={<AdminStage3PlannedNotVisitedPage />} />
+          <Route path="/admin/stage4-enquiry-effectiveness" element={<AdminStage4EnquiryEffectivenessPage />} />
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
         </Route>
