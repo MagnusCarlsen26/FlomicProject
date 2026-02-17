@@ -1,10 +1,12 @@
 import { memo, useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../context/useAuth'
 import PageSurface from '../components/layout/PageSurface'
 import StatTile from '../components/layout/StatTile'
 import PageEnter from '../components/motion/PageEnter'
 import RevealCard from '../components/motion/RevealCard'
 import StaggerGroup from '../components/motion/StaggerGroup'
 import Alert from '../components/ui/Alert'
+import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
@@ -300,6 +302,7 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
 }
 
 const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
+  user,
   week,
   planningSubmittedAt,
   actualUpdatedAt,
@@ -309,11 +312,22 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
   loading,
   onRefresh,
 }) {
+  const hasJsvAlert = user?.jsvRepeatAlert?.active === true
+  const alertMessage = user?.jsvRepeatAlert?.message || ''
+
   return (
     <GlassCard className="overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Salesman</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold text-text-primary">{user?.name || user?.email || 'Signed in'}</p>
+            {hasJsvAlert ? (
+              <Badge tone="warning" title={alertMessage}>
+                JSV Alert
+              </Badge>
+            ) : null}
+          </div>
         </div>
         <Button variant="secondary" onClick={onRefresh} disabled={loading}>
           {loading ? 'Refreshing...' : 'Refresh'}
@@ -350,6 +364,7 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
 })
 
 export default function SalesmanPage() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
@@ -437,6 +452,7 @@ export default function SalesmanPage() {
     <PageEnter>
       <PageSurface>
         <SalesmanHeaderCard
+          user={user}
           week={week}
           planningSubmittedAt={planningSubmittedAt}
           actualUpdatedAt={actualUpdatedAt}

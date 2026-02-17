@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 import { useTheme } from '../../context/useTheme'
 import { hasRole } from '../../utils/roles'
+import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import { cn } from '../ui/cn'
 
@@ -27,6 +28,8 @@ export default function TopNav() {
   const hideSalesmanNav = location.pathname === '/salesman'
   const hideInsightsUserInfo = location.pathname === '/admin/insights'
   const navItems = getNavItems(user)
+  const alertMessage = user?.jsvRepeatAlert?.message || ''
+  const hasJsvAlert = user?.jsvRepeatAlert?.active === true
 
   if (hideSalesmanNav) {
     return (
@@ -34,7 +37,14 @@ export default function TopNav() {
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 md:px-6">
           <div className="mr-auto min-w-[180px]">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Flomic</p>
-            <p className="text-xs text-text-secondary">{user?.name || user?.email || 'Signed in'}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-text-secondary">{user?.name || user?.email || 'Signed in'}</p>
+              {hasJsvAlert ? (
+                <Badge tone="warning" className="py-0.5 text-[10px]" title={alertMessage}>
+                  JSV Alert
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <div className="order-2 ml-auto flex items-center gap-2 md:order-3">
@@ -56,7 +66,14 @@ export default function TopNav() {
         <div className="mr-auto min-w-[180px]">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Flomic</p>
           {!hideInsightsUserInfo ? (
-            <p className="text-xs text-text-secondary">{user?.name || user?.email || 'Signed in'}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-text-secondary">{user?.name || user?.email || 'Signed in'}</p>
+              {hasJsvAlert ? (
+                <Badge tone="warning" className="py-0.5 text-[10px]" title={alertMessage}>
+                  JSV Alert
+                </Badge>
+              ) : null}
+            </div>
           ) : null}
         </div>
 

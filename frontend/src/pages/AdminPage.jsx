@@ -308,7 +308,7 @@ export default function AdminPage() {
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Productivity Tables</h3>
             <div className="grid gap-4 xl:grid-cols-2">
-              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+              <details className="rounded-xl border border-slate-200 bg-white p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
                   Geographic Productivity
                 </summary>
@@ -316,7 +316,7 @@ export default function AdminPage() {
                   <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
                 </div>
               </details>
-              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+              <details className="rounded-xl border border-slate-200 bg-white p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
                   Salesperson Productivity
                 </summary>
@@ -324,7 +324,7 @@ export default function AdminPage() {
                   <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
                 </div>
               </details>
-              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+              <details className="rounded-xl border border-slate-200 bg-white p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
                   Customer Productivity
                 </summary>

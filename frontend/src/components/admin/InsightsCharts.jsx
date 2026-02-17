@@ -40,9 +40,6 @@ export default function InsightsCharts({ charts }) {
   const { resolvedTheme } = useTheme()
   const chartTheme = getChartTheme(resolvedTheme)
 
-  const actualVsPlanned = (charts?.actualVsPlannedBySalesperson || []).filter(
-    (row) => (row?.plannedVisits || 0) > 0 || (row?.actualVisits || 0) > 0,
-  )
   const contactDistribution = charts?.contactTypeDistribution || []
   const conversionByCustomerType = charts?.conversionByCustomerType || []
   const conversionByVisitType = charts?.conversionByVisitType || []

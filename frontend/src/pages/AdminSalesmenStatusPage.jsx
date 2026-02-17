@@ -202,7 +202,14 @@ export default function AdminSalesmenStatusPage() {
             >
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold text-text-primary">{entry.salesman.name || entry.salesman.email}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-semibold text-text-primary">{entry.salesman.name || entry.salesman.email}</p>
+                    {entry.salesman?.jsvRepeatAlert?.active ? (
+                      <Badge tone="warning" title={entry.salesman?.jsvRepeatAlert?.message || ''}>
+                        JSV Alert
+                      </Badge>
+                    ) : null}
+                  </div>
                   <p className="text-sm text-text-secondary">{entry.salesman.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

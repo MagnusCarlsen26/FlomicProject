@@ -260,7 +260,7 @@ export default function AdminInsightsPage() {
           <GlassCard className="space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Productivity Tables</h3>
             <div className="flex flex-col gap-6">
-              <details className="rounded-2xl border border-border bg-surface p-4" open>
+              <details className="rounded-2xl border border-border bg-surface p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
                   Geographic Productivity
                 </summary>
@@ -268,7 +268,7 @@ export default function AdminInsightsPage() {
                   <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
                 </div>
               </details>
-              <details className="rounded-2xl border border-border bg-surface p-4" open>
+              <details className="rounded-2xl border border-border bg-surface p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
                   Salesperson Productivity
                 </summary>
@@ -276,7 +276,7 @@ export default function AdminInsightsPage() {
                   <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
                 </div>
               </details>
-              <details className="rounded-2xl border border-border bg-surface p-4" open>
+              <details className="rounded-2xl border border-border bg-surface p-4">
                 <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
                   Customer Productivity
                 </summary>

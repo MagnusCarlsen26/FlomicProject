@@ -17,6 +17,7 @@ const { requireAuth, requireRole } = require('./middleware/auth');
 const { clearSessionCookie, setSessionCookie } = require('./utils/session');
 const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
 const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminInsights');
+const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
   buildDefaultPlanningRows,
@@ -77,10 +78,12 @@ app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
-function buildSafeUser(user) {
+function buildSafeUser(user, options = {}) {
   if (!user) {
     return null;
   }
+
+  const threshold = Number.isInteger(options.threshold) ? options.threshold : 3;
 
   return {
     id: String(user._id || user.id),
@@ -88,6 +91,7 @@ function buildSafeUser(user) {
     name: user.name || '',
     role: user.role,
     picture: user.picture || '',
+    jsvRepeatAlert: options.jsvRepeatAlert || buildInactiveAlert(threshold),
   };
 }
 
@@ -300,12 +304,14 @@ app.post('/api/auth/google', async (req, res) => {
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
+  const threshold = 3;
   const tokenUser = {
     id: req.auth.userId,
     email: req.auth.email || '',
     name: req.auth.name || '',
     role: req.auth.role || 'salesman',
     picture: '',
+    jsvRepeatAlert: buildInactiveAlert(threshold),
   };
 
   if (!hasDbConnection()) {
@@ -320,9 +326,23 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(401).json({ message: 'Session user not found' });
     }
 
+    const historicalReports = await WeeklyReport.find({
+      salesmanId: user._id,
+    })
+      .select('salesmanId planningRows.customerName planningRows.contactType')
+      .lean();
+    const alertsBySalesman = buildJsvRepeatAlertsBySalesman({
+      reports: historicalReports,
+      threshold,
+    });
+    const userAlert = alertsBySalesman.get(String(user._id)) || buildInactiveAlert(threshold);
+
     // Keep JWT claims in sync with current DB role/profile.
     setSessionCookie(res, user);
-    return res.status(200).json({ user: buildSafeUser(user), source: 'database' });
+    return res.status(200).json({
+      user: buildSafeUser(user, { jsvRepeatAlert: userAlert, threshold }),
+      source: 'database',
+    });
   } catch (error) {
     console.error('Session lookup error:', error);
     return res.status(200).json({ user: tokenUser, source: 'token' });
@@ -505,6 +525,7 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
   }
 
   try {
+    const threshold = 3;
     const adminUsers = await listAdminUsers();
     const adminLabelById = new Map(
       adminUsers.map((admin) => [admin.id, admin.name || admin.email])
@@ -537,14 +558,25 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
       salesmanId: { $in: salesmanIds },
       weekKey: week.key,
     }).lean();
+    const historicalReports = await WeeklyReport.find({
+      salesmanId: { $in: salesmanIds },
+    })
+      .select('salesmanId planningRows.customerName planningRows.contactType')
+      .lean();
 
     const reportBySalesmanId = new Map(
       reports.map((report) => [String(report.salesmanId), report])
     );
+    const alertsBySalesman = buildJsvRepeatAlertsBySalesman({
+      reports: historicalReports,
+      threshold,
+    });
 
     const entries = salesmen
       .map((salesman) => {
         const report = reportBySalesmanId.get(String(salesman._id));
+        const jsvRepeatAlert =
+          alertsBySalesman.get(String(salesman._id)) || buildInactiveAlert(threshold);
 
         return {
           salesman: {
@@ -553,6 +585,7 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
             email: salesman.email,
             picture: salesman.picture || '',
             role: salesman.role,
+            jsvRepeatAlert,
           },
           planning: {
             rows: mapPlanningRowsForDisplay(report?.planningRows || [], adminLabelById),
