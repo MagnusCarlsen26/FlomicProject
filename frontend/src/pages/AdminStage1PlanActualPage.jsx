@@ -194,6 +194,28 @@ export default function AdminStage1PlanActualPage() {
   const topUnder = data?.topPerformers?.underAchievers || []
   const drilldownRows = useMemo(() => (data?.drilldownRows || []).slice(0, 50), [data])
 
+  // Filter subteam options based on selected team
+  const filteredSubTeamOptions = useMemo(() => {
+    if (!team || !data?.filterOptions?.teamHierarchy) {
+      return data?.filterOptions?.subTeam || []
+    }
+    return data.filterOptions.teamHierarchy[team] || []
+  }, [team, data?.filterOptions?.teamHierarchy, data?.filterOptions?.subTeam])
+
+  // Filter salesman options based on selected hierarchy (subTeam > team > mainTeam)
+  const filteredSalesmenOptions = useMemo(() => {
+    if (subTeam && data?.filterOptions?.subTeamSalesmenMap) {
+      return data.filterOptions.subTeamSalesmenMap[subTeam] || []
+    }
+    if (team && data?.filterOptions?.teamSalesmenMap) {
+      return data.filterOptions.teamSalesmenMap[team] || []
+    }
+    if (mainTeam && data?.filterOptions?.mainTeamSalesmenMap) {
+      return data.filterOptions.mainTeamSalesmenMap[mainTeam] || []
+    }
+    return data?.filterOptions?.salesmen || []
+  }, [mainTeam, team, subTeam, data?.filterOptions?.mainTeamSalesmenMap, data?.filterOptions?.teamSalesmenMap, data?.filterOptions?.subTeamSalesmenMap, data?.filterOptions?.salesmen])
+
   return (
     <PageEnter>
       <PageSurface>
@@ -238,7 +260,7 @@ export default function AdminStage1PlanActualPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Salespeople</label>
               <MultiSelect
-                options={data?.filterOptions?.salesmen || []}
+                options={filteredSalesmenOptions}
                 selected={salesmen}
                 onChange={setSalesmen}
                 placeholder="All salespeople"
@@ -269,7 +291,20 @@ export default function AdminStage1PlanActualPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Main Team</label>
-              <select className="input-core" value={mainTeam} onChange={(e) => setMainTeam(e.target.value)}>
+              <select
+                className="input-core"
+                value={mainTeam}
+                onChange={(e) => {
+                  const newMainTeam = e.target.value
+                  setMainTeam(newMainTeam)
+                  // Clear salesmen if they don't belong to the new mainTeam
+                  if (newMainTeam && salesmen.length > 0) {
+                    const validSalesmen = data?.filterOptions?.mainTeamSalesmenMap?.[newMainTeam] || []
+                    const validSalesmenIds = new Set(validSalesmen.map(s => s.id))
+                    setSalesmen(salesmen.filter(id => validSalesmenIds.has(id)))
+                  }
+                }}
+              >
                 <option value="">All</option>
                 {(data?.filterOptions?.mainTeam || []).map((item) => (
                   <option key={item} value={item}>
@@ -280,7 +315,27 @@ export default function AdminStage1PlanActualPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Team</label>
-              <select className="input-core" value={team} onChange={(e) => setTeam(e.target.value)}>
+              <select
+                className="input-core"
+                value={team}
+                onChange={(e) => {
+                  const newTeam = e.target.value
+                  setTeam(newTeam)
+                  // Clear subTeam if it doesn't belong to the new team
+                  if (newTeam && subTeam) {
+                    const validSubTeams = data?.filterOptions?.teamHierarchy?.[newTeam] || []
+                    if (!validSubTeams.includes(subTeam)) {
+                      setSubTeam('')
+                    }
+                  }
+                  // Clear salesmen if they don't belong to the new team
+                  if (newTeam && salesmen.length > 0) {
+                    const validSalesmen = data?.filterOptions?.teamSalesmenMap?.[newTeam] || []
+                    const validSalesmenIds = new Set(validSalesmen.map(s => s.id))
+                    setSalesmen(salesmen.filter(id => validSalesmenIds.has(id)))
+                  }
+                }}
+              >
                 <option value="">All</option>
                 {(data?.filterOptions?.team || []).map((item) => (
                   <option key={item} value={item}>
@@ -291,9 +346,22 @@ export default function AdminStage1PlanActualPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Sub Team</label>
-              <select className="input-core" value={subTeam} onChange={(e) => setSubTeam(e.target.value)}>
+              <select
+                className="input-core"
+                value={subTeam}
+                onChange={(e) => {
+                  const newSubTeam = e.target.value
+                  setSubTeam(newSubTeam)
+                  // Clear salesmen if they don't belong to the new subTeam
+                  if (newSubTeam && salesmen.length > 0) {
+                    const validSalesmen = data?.filterOptions?.subTeamSalesmenMap?.[newSubTeam] || []
+                    const validSalesmenIds = new Set(validSalesmen.map(s => s.id))
+                    setSalesmen(salesmen.filter(id => validSalesmenIds.has(id)))
+                  }
+                }}
+              >
                 <option value="">All</option>
-                {(data?.filterOptions?.subTeam || []).map((item) => (
+                {filteredSubTeamOptions.map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>

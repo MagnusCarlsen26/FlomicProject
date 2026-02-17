@@ -238,6 +238,10 @@ function buildStage1Payload({ users, reports, range, filters }) {
   const mainTeamSet = new Set();
   const teamSet = new Set();
   const subTeamSet = new Set();
+  const teamToSubTeamsMap = new Map();
+  const mainTeamToSalesmenMap = new Map();
+  const teamToSalesmenMap = new Map();
+  const subTeamToSalesmenMap = new Map();
 
   for (const user of users || []) {
     const id = String(user._id);
@@ -254,6 +258,28 @@ function buildStage1Payload({ users, reports, range, filters }) {
     mainTeamSet.add(normalizedUser.mainTeam);
     teamSet.add(normalizedUser.team);
     subTeamSet.add(normalizedUser.subTeam);
+    
+    // Build team-to-subteam mapping
+    if (!teamToSubTeamsMap.has(normalizedUser.team)) {
+      teamToSubTeamsMap.set(normalizedUser.team, new Set());
+    }
+    teamToSubTeamsMap.get(normalizedUser.team).add(normalizedUser.subTeam);
+    
+    // Build hierarchy-to-salesmen mappings
+    if (!mainTeamToSalesmenMap.has(normalizedUser.mainTeam)) {
+      mainTeamToSalesmenMap.set(normalizedUser.mainTeam, []);
+    }
+    mainTeamToSalesmenMap.get(normalizedUser.mainTeam).push({ id, name: normalizedUser.name || normalizedUser.email });
+    
+    if (!teamToSalesmenMap.has(normalizedUser.team)) {
+      teamToSalesmenMap.set(normalizedUser.team, []);
+    }
+    teamToSalesmenMap.get(normalizedUser.team).push({ id, name: normalizedUser.name || normalizedUser.email });
+    
+    if (!subTeamToSalesmenMap.has(normalizedUser.subTeam)) {
+      subTeamToSalesmenMap.set(normalizedUser.subTeam, []);
+    }
+    subTeamToSalesmenMap.get(normalizedUser.subTeam).push({ id, name: normalizedUser.name || normalizedUser.email });
   }
 
   const totals = createMetricAccumulator();
@@ -476,6 +502,30 @@ function buildStage1Payload({ users, reports, range, filters }) {
       subTeam: Array.from(subTeamSet).sort((a, b) => a.localeCompare(b)),
       callType: ['nc', 'fc', 'jsv', 'sc', 'unknown'],
       customerType: ['targeted_budgeted', 'existing'],
+      teamHierarchy: Object.fromEntries(
+        Array.from(teamToSubTeamsMap.entries()).map(([team, subTeams]) => [
+          team,
+          Array.from(subTeams).sort((a, b) => a.localeCompare(b)),
+        ])
+      ),
+      mainTeamSalesmenMap: Object.fromEntries(
+        Array.from(mainTeamToSalesmenMap.entries()).map(([mainTeam, salesmen]) => [
+          mainTeam,
+          salesmen.sort((a, b) => a.name.localeCompare(b.name)),
+        ])
+      ),
+      teamSalesmenMap: Object.fromEntries(
+        Array.from(teamToSalesmenMap.entries()).map(([team, salesmen]) => [
+          team,
+          salesmen.sort((a, b) => a.name.localeCompare(b.name)),
+        ])
+      ),
+      subTeamSalesmenMap: Object.fromEntries(
+        Array.from(subTeamToSalesmenMap.entries()).map(([subTeam, salesmen]) => [
+          subTeam,
+          salesmen.sort((a, b) => a.name.localeCompare(b.name)),
+        ])
+      ),
     },
   };
 }
