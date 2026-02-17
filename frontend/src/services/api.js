@@ -252,4 +252,37 @@ export async function getAdminStage1PlanActual({
   return apiFetch(`/api/admin/stage1-plan-actual${suffix}`)
 }
 
+export async function getAdminStage2ActivityCompliance({
+  week,
+  q,
+  salesmen,
+  mainTeam,
+  team,
+  subTeam,
+} = {}) {
+  const params = new URLSearchParams()
+
+  if (week) {
+    params.set('week', week)
+  }
+  if (q) {
+    params.set('q', q)
+  }
+  if (salesmen && salesmen.length > 0) {
+    params.set('salesmen', Array.isArray(salesmen) ? salesmen.join(',') : salesmen)
+  }
+  if (mainTeam) {
+    params.set('mainTeam', mainTeam)
+  }
+  if (team) {
+    params.set('team', team)
+  }
+  if (subTeam) {
+    params.set('subTeam', subTeam)
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/stage2-activity-compliance${suffix}`)
+}
+
 export { ApiError }

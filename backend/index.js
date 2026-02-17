@@ -18,6 +18,7 @@ const { clearSessionCookie, setSessionCookie } = require('./utils/session');
 const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
 const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminInsights');
 const { buildStage1Payload, resolveStage1Range } = require('./utils/stage1PlanActual');
+const { buildStage2Payload, resolveStage2Range } = require('./utils/stage2ActivityCompliance');
 const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
@@ -791,6 +792,76 @@ app.get('/api/admin/stage1-plan-actual', requireAuth, requireRole('admin'), asyn
     return res.status(500).json({ message: 'Unable to fetch stage 1 plan-vs-actual data' });
   }
 });
+
+app.get('/api/admin/stage2-activity-compliance', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const rangeResult = resolveStage2Range(req.query || {});
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const salesmenIds = String(req.query?.salesmen || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const mainTeam = String(req.query?.mainTeam || '').trim();
+  const team = String(req.query?.team || '').trim();
+  const subTeam = String(req.query?.subTeam || '').trim();
+  const q = String(req.query?.q || '').trim();
+
+  try {
+    const userQuery = { role: { $in: ['salesman', 'admin'] } };
+    if (q) {
+      const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedQ, 'i');
+      userQuery.$or = [{ name: regex }, { email: regex }];
+    }
+
+    if (salesmenIds.length > 0) {
+      userQuery._id = { $in: salesmenIds };
+    }
+    if (mainTeam) userQuery.mainTeam = mainTeam;
+    if (team) userQuery.team = team;
+    if (subTeam) userQuery.subTeam = subTeam;
+
+    const users = await User.find(userQuery)
+      .select('_id name email mainTeam team subTeam role picture')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    const userIds = users.map((user) => user._id);
+    const reports =
+      userIds.length === 0
+        ? []
+        : await WeeklyReport.find({
+            salesmanId: { $in: userIds },
+            weekKey: rangeResult.key,
+          })
+            .select('salesmanId planningRows actualOutputRows weekKey')
+            .lean();
+
+    const payload = buildStage2Payload({
+      users,
+      reports,
+      range: rangeResult,
+      filters: {
+        salesmen: salesmenIds,
+        mainTeam,
+        team,
+        subTeam,
+      },
+    });
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('Stage 2 activity compliance fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch stage 2 activity compliance data' });
+  }
+});
+
 
 function normalizeMongoUri(value) {
   if (typeof value !== 'string') {
