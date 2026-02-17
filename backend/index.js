@@ -13,6 +13,7 @@ if (process.env.NODE_ENV !== 'production') {
 const User = require('./models/User');
 const WeeklyReport = require('./models/WeeklyReport');
 const StatusUpdate = require('./models/StatusUpdate');
+const ExceptionCase = require('./models/ExceptionCase');
 const { requireAuth, requireRole } = require('./middleware/auth');
 const { clearSessionCookie, setSessionCookie } = require('./utils/session');
 const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
@@ -21,6 +22,12 @@ const { buildStage1Payload, resolveStage1Range } = require('./utils/stage1PlanAc
 const { buildStage2Payload, resolveStage2Range } = require('./utils/stage2ActivityCompliance');
 const { buildStage3Payload, resolveStage3Range } = require('./utils/stage3PlannedNotVisited');
 const { buildStage4Payload, resolveStage4Range, DEFAULT_THRESHOLDS } = require('./utils/stage4EnquiryEffectiveness');
+const {
+  buildStage5Candidates,
+  buildStage5Payload,
+  resolveStage5Range,
+  validateStatusTransition,
+} = require('./utils/stage5ExceptionQuality');
 const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
@@ -194,6 +201,114 @@ function buildSalesmanWeekResponse(report, week, jsvAdminUsers = []) {
       updatedAt: report.statusUpdatedAt || null,
     },
     jsvAdminUsers,
+  };
+}
+
+async function syncStage5Cases({ candidates, actorId }) {
+  const candidateMap = new Map();
+  for (const candidate of candidates || []) {
+    candidateMap.set(candidate.caseKey, candidate);
+  }
+
+  const now = new Date();
+
+  if (candidateMap.size > 0) {
+    const operations = Array.from(candidateMap.values()).map((candidate) => ({
+      updateOne: {
+        filter: { caseKey: candidate.caseKey },
+        update: {
+          $set: {
+            ruleId: candidate.ruleId,
+            customerName: candidate.customerName,
+            normalizedCustomer: candidate.normalizedCustomer,
+            salesmanId: candidate.salesmanId,
+            salesmanName: candidate.salesmanName,
+            team: candidate.team,
+            adminOwnerId: candidate.adminOwnerId || '',
+            firstSeenDate: candidate.firstSeenDate,
+            latestSeenDate: candidate.latestSeenDate,
+            active: true,
+            lastComputedAt: now,
+            metrics: candidate.metrics,
+            timeline: candidate.timeline,
+          },
+          $setOnInsert: {
+            status: 'open',
+            resolvedAt: null,
+            statusHistory: [],
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    await ExceptionCase.bulkWrite(operations);
+  }
+
+  const existingActiveCases = await ExceptionCase.find({ active: true })
+    .select('_id caseKey status')
+    .lean();
+
+  const staleCaseIds = existingActiveCases
+    .filter((row) => !candidateMap.has(row.caseKey))
+    .map((row) => String(row._id));
+
+  if (staleCaseIds.length > 0) {
+    const openOrReviewCases = existingActiveCases.filter(
+      (row) => staleCaseIds.includes(String(row._id)) && ['open', 'in_review'].includes(row.status)
+    );
+
+    if (openOrReviewCases.length > 0) {
+      const transitionOperations = openOrReviewCases.map((row) => ({
+        updateOne: {
+          filter: { _id: row._id },
+          update: {
+            $set: {
+              active: false,
+              status: 'resolved',
+              resolvedAt: now,
+              lastComputedAt: now,
+            },
+            $push: {
+              statusHistory: {
+                fromStatus: row.status,
+                toStatus: 'resolved',
+                changedBy: actorId || 'system',
+                changedAt: now,
+                note: 'Auto-resolved: no longer matching exception rule.',
+              },
+            },
+          },
+        },
+      }));
+
+      await ExceptionCase.bulkWrite(transitionOperations);
+    }
+
+    await ExceptionCase.updateMany(
+      { _id: { $in: staleCaseIds }, status: { $nin: ['open', 'in_review'] } },
+      {
+        $set: {
+          active: false,
+          lastComputedAt: now,
+        },
+      }
+    );
+  }
+}
+
+function parseStage5Filters(query = {}) {
+  return {
+    salesmen: String(query.salesmen || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+    team: String(query.team || '').trim(),
+    admin: String(query.admin || '').trim(),
+    rule: String(query.rule || '').trim().toUpperCase(),
+    status: String(query.status || '').trim().toLowerCase(),
+    ageingBucket: String(query.ageingBucket || '').trim(),
+    customer: String(query.customer || '').trim(),
   };
 }
 
@@ -617,6 +732,153 @@ app.get('/api/admin/stage4-enquiry-effectiveness', requireAuth, requireRole('adm
   } catch (error) {
     console.error('Stage 4 enquiry effectiveness fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch stage 4 data' });
+  }
+});
+
+app.get('/api/admin/stage5-exception-quality', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const rangeResult = resolveStage5Range(req.query || {});
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const filters = parseStage5Filters(req.query || {});
+
+  try {
+    const users = await User.find({ role: { $in: ['salesman', 'admin'] } })
+      .select('_id name email role team')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    const userIds = users.map((user) => user._id);
+    const reports =
+      userIds.length === 0
+        ? []
+        : await WeeklyReport.find({
+            salesmanId: { $in: userIds },
+            weekStartDateUtc: {
+              $gte: rangeResult.fromWeek.weekStartDateUtc,
+              $lte: rangeResult.toWeek.weekStartDateUtc,
+            },
+          })
+            .select('salesmanId planningRows actualOutputRows weekKey')
+            .lean();
+
+    const candidateResult = buildStage5Candidates({
+      users,
+      reports,
+      range: rangeResult,
+    });
+
+    await syncStage5Cases({
+      candidates: candidateResult.candidates,
+      actorId: req.auth.userId,
+    });
+
+    const exceptionCases = await ExceptionCase.find({})
+      .sort({ firstSeenDate: 1, customerName: 1 })
+      .lean();
+
+    const payload = buildStage5Payload({
+      cases: exceptionCases,
+      range: rangeResult,
+      filters,
+      filterOptions: candidateResult.filterOptions,
+    });
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('Stage 5 exception-quality fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch stage 5 data' });
+  }
+});
+
+app.patch('/api/admin/stage5-exception-quality/:caseId/status', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const caseId = String(req.params?.caseId || '').trim();
+  const nextStatus = String(req.body?.status || '').trim().toLowerCase();
+  const note = String(req.body?.note || '').trim().slice(0, 1000);
+
+  if (!caseId) {
+    return res.status(400).json({ message: 'caseId is required' });
+  }
+
+  try {
+    const exceptionCase = await ExceptionCase.findById(caseId);
+    if (!exceptionCase) {
+      return res.status(404).json({ message: 'Exception case not found' });
+    }
+
+    const transitionResult = validateStatusTransition(exceptionCase.status, nextStatus);
+    if (!transitionResult.ok) {
+      return res.status(400).json({ message: transitionResult.message });
+    }
+
+    const currentStatus = exceptionCase.status;
+    if (currentStatus !== nextStatus) {
+      exceptionCase.status = nextStatus;
+      exceptionCase.resolvedAt = nextStatus === 'resolved' ? new Date() : null;
+      exceptionCase.statusHistory.push({
+        fromStatus: currentStatus,
+        toStatus: nextStatus,
+        changedBy: String(req.auth.userId || ''),
+        changedAt: new Date(),
+        note,
+      });
+      await exceptionCase.save();
+    }
+
+    return res.status(200).json({
+      case: {
+        id: String(exceptionCase._id),
+        status: exceptionCase.status,
+        resolvedAt: exceptionCase.resolvedAt,
+        updatedAt: exceptionCase.updatedAt,
+        statusHistoryTail: exceptionCase.statusHistory.slice(-5),
+      },
+    });
+  } catch (error) {
+    console.error('Stage 5 exception-status update error:', error);
+    return res.status(500).json({ message: 'Unable to update exception status' });
+  }
+});
+
+app.get('/api/admin/stage5-exception-quality/:caseId/timeline', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const caseId = String(req.params?.caseId || '').trim();
+  if (!caseId) {
+    return res.status(400).json({ message: 'caseId is required' });
+  }
+
+  try {
+    const exceptionCase = await ExceptionCase.findById(caseId).lean();
+    if (!exceptionCase) {
+      return res.status(404).json({ message: 'Exception case not found' });
+    }
+
+    return res.status(200).json({
+      case: {
+        id: String(exceptionCase._id),
+        caseKey: exceptionCase.caseKey,
+        ruleId: exceptionCase.ruleId,
+        customerName: exceptionCase.customerName,
+        salesmanId: exceptionCase.salesmanId,
+        salesmanName: exceptionCase.salesmanName,
+      },
+      timeline: Array.isArray(exceptionCase.timeline) ? exceptionCase.timeline : [],
+    });
+  } catch (error) {
+    console.error('Stage 5 timeline fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch exception timeline' });
   }
 });
 

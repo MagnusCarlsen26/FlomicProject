@@ -24,6 +24,9 @@ export default function AdminSectionTabs() {
       <NavLink to="/admin/stage4-enquiry-effectiveness" className={getTabClassName}>
         Stage 4
       </NavLink>
+      <NavLink to="/admin/stage5-exception-quality" className={getTabClassName}>
+        Stage 5
+      </NavLink>
       <NavLink to="/admin/insights" className={getTabClassName}>
         Insights
       </NavLink>

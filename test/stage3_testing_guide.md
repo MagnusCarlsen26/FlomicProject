@@ -1,4 +1,4 @@
-# Stage 3 Planned-but-Not-Visited Testing Guide
+ # Stage 3 Planned-but-Not-Visited Testing Guide
 
 This guide describes how to verify the Stage 3 Planned-but-Not-Visited Tracking implementation.
 

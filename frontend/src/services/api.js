@@ -353,4 +353,43 @@ export async function getAdminStage3PlannedNotVisited({
   return apiFetch(`/api/admin/stage3-planned-not-visited${suffix}`)
 }
 
+export async function getAdminStage5ExceptionQuality({
+  from,
+  to,
+  salesmen,
+  team,
+  admin,
+  rule,
+  status,
+  ageingBucket,
+  customer,
+} = {}) {
+  const params = new URLSearchParams()
+
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (salesmen && salesmen.length > 0) {
+    params.set('salesmen', Array.isArray(salesmen) ? salesmen.join(',') : salesmen)
+  }
+  if (team) params.set('team', team)
+  if (admin) params.set('admin', admin)
+  if (rule) params.set('rule', rule)
+  if (status) params.set('status', status)
+  if (ageingBucket) params.set('ageingBucket', ageingBucket)
+  if (customer) params.set('customer', customer)
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/stage5-exception-quality${suffix}`)
+}
+
+export async function updateAdminStage5ExceptionStatus(caseId, { status, note } = {}) {
+  return apiFetch(`/api/admin/stage5-exception-quality/${caseId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status,
+      note,
+    }),
+  })
+}
+
 export { ApiError }

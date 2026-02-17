@@ -11,6 +11,7 @@ import AdminStage1PlanActualPage from './pages/AdminStage1PlanActualPage'
 import AdminStage2ActivityCompliancePage from './pages/AdminStage2ActivityCompliancePage'
 import AdminStage3PlannedNotVisitedPage from './pages/AdminStage3PlannedNotVisitedPage'
 import AdminStage4EnquiryEffectivenessPage from './pages/AdminStage4EnquiryEffectivenessPage'
+import AdminStage5ExceptionQualityPage from './pages/AdminStage5ExceptionQualityPage'
 import { getDefaultRoute } from './utils/roles'
 
 function LoadingScreen() {
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/admin/stage2-activity-compliance" element={<AdminStage2ActivityCompliancePage />} />
           <Route path="/admin/stage3-planned-not-visited" element={<AdminStage3PlannedNotVisitedPage />} />
           <Route path="/admin/stage4-enquiry-effectiveness" element={<AdminStage4EnquiryEffectivenessPage />} />
+          <Route path="/admin/stage5-exception-quality" element={<AdminStage5ExceptionQualityPage />} />
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
         </Route>
