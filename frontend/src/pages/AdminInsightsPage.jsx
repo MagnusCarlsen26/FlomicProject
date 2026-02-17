@@ -7,18 +7,16 @@ import InsightCard from '../components/admin/InsightCard'
 import InsightsCharts from '../components/admin/InsightsCharts'
 import LocationProductivityTable from '../components/admin/LocationProductivityTable'
 import SalespersonProductivityTable from '../components/admin/SalespersonProductivityTable'
+import CustomerProductivityTable from '../components/admin/CustomerProductivityTable'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import MultiSelect from '../components/ui/MultiSelect'
-import { useAuth } from '../context/useAuth'
 import { getAdminInsights, getAdminSalesmen } from '../services/api'
 import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
 
 export default function AdminInsightsPage() {
-  const { user } = useAuth()
-
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -262,14 +260,30 @@ export default function AdminInsightsPage() {
           <GlassCard className="space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Productivity Tables</h3>
             <div className="flex flex-col gap-6">
-              <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Geographic Productivity</h4>
-                <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
-              </div>
-              <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Productivity</h4>
-                <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
-              </div>
+              <details className="rounded-2xl border border-border bg-surface p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
+                  Geographic Productivity
+                </summary>
+                <div className="mt-3">
+                  <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
+                </div>
+              </details>
+              <details className="rounded-2xl border border-border bg-surface p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
+                  Salesperson Productivity
+                </summary>
+                <div className="mt-3">
+                  <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
+                </div>
+              </details>
+              <details className="rounded-2xl border border-border bg-surface p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-text-muted">
+                  Customer Productivity
+                </summary>
+                <div className="mt-3">
+                  <CustomerProductivityTable rows={insights?.tables?.customerProductivity} />
+                </div>
+              </details>
             </div>
           </GlassCard>
 

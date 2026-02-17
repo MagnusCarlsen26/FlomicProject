@@ -102,6 +102,29 @@ test('buildInsightsPayload computes core KPIs and chart data', () => {
   assert.equal(payload.kpis.mostProductiveDay.day, 'Tuesday');
   assert.equal(payload.tables.locationProductivity.length, 2);
   assert.equal(payload.tables.salespersonProductivity.length, 2);
+  assert.equal(payload.tables.customerProductivity.length, 2);
+
+  const acmeRow = payload.tables.customerProductivity.find((row) => row.customer === 'Acme');
+  assert.deepEqual(acmeRow, {
+    customer: 'Acme',
+    plannedVisits: 2,
+    actualVisits: 2,
+    enquiries: 2,
+    shipments: 1,
+    completionRate: 1,
+    conversionRate: 0.5,
+  });
+
+  const bravoRow = payload.tables.customerProductivity.find((row) => row.customer === 'Bravo');
+  assert.deepEqual(bravoRow, {
+    customer: 'Bravo',
+    plannedVisits: 1,
+    actualVisits: 0,
+    enquiries: 1,
+    shipments: 0,
+    completionRate: 0,
+    conversionRate: 0,
+  });
 });
 
 test('buildInsightsPayload safely handles zero denominators and no lag samples', () => {
@@ -124,4 +147,6 @@ test('buildInsightsPayload safely handles zero denominators and no lag samples',
   assert.equal(payload.kpis.shipmentsPerVisit.value, 0);
   assert.equal(payload.kpis.averageDaysEnquiryToShipment, null);
   assert.equal(payload.notes.length >= 2, true);
+  assert.equal(payload.tables.customerProductivity.length, 1);
+  assert.equal(payload.tables.customerProductivity[0].conversionRate, 0);
 });

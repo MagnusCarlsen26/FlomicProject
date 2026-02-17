@@ -226,6 +226,7 @@ function buildInsightsPayload({ users, reports, range }) {
   const visitTypeConversion = createBaseBuckets(CONTACT_TYPES, () => ({ enquiries: 0, shipments: 0 }));
   const weekdayProductivity = createBaseBuckets(WEEKDAY_ORDER, () => ({ enquiries: 0, shipments: 0 }));
   const locationProductivity = new Map();
+  const customerProductivity = new Map();
 
   const salespeople = (users || []).map((user) => ({
     id: String(user._id),
@@ -329,6 +330,25 @@ function buildInsightsPayload({ users, reports, range }) {
         }
         locationEntry.enquiries += actualRow.enquiriesReceived;
         locationEntry.shipments += actualRow.shipmentsConverted;
+
+        const customer = String(row.customerName || '').trim() || 'Unspecified';
+        if (!customerProductivity.has(customer)) {
+          customerProductivity.set(customer, {
+            customer,
+            plannedVisits: 0,
+            actualVisits: 0,
+            enquiries: 0,
+            shipments: 0,
+          });
+        }
+
+        const customerEntry = customerProductivity.get(customer);
+        customerEntry.plannedVisits += 1;
+        if (actualRow.visited === 'yes') {
+          customerEntry.actualVisits += 1;
+        }
+        customerEntry.enquiries += actualRow.enquiriesReceived;
+        customerEntry.shipments += actualRow.shipmentsConverted;
 
         const customerName = String(row.customerName || '').trim().toLowerCase();
         if (customerName) {
@@ -506,6 +526,18 @@ function buildInsightsPayload({ users, reports, range }) {
         return b.shipments - a.shipments;
       }),
       locationProductivity: Array.from(locationProductivity.values())
+        .map((row) => ({
+          ...row,
+          completionRate: roundNumber(safeDivide(row.actualVisits, row.plannedVisits)),
+          conversionRate: roundNumber(safeDivide(row.shipments, row.enquiries)),
+        }))
+        .sort((a, b) => {
+          if (b.actualVisits !== a.actualVisits) {
+            return b.actualVisits - a.actualVisits;
+          }
+          return b.shipments - a.shipments;
+        }),
+      customerProductivity: Array.from(customerProductivity.values())
         .map((row) => ({
           ...row,
           completionRate: roundNumber(safeDivide(row.actualVisits, row.plannedVisits)),

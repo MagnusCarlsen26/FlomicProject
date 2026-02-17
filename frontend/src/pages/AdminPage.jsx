@@ -6,6 +6,7 @@ import InsightCard from '../components/admin/InsightCard'
 import InsightsCharts from '../components/admin/InsightsCharts'
 import LocationProductivityTable from '../components/admin/LocationProductivityTable'
 import SalespersonProductivityTable from '../components/admin/SalespersonProductivityTable'
+import CustomerProductivityTable from '../components/admin/CustomerProductivityTable'
 
 const POLL_INTERVAL_MS = 30000
 
@@ -129,7 +130,7 @@ function ActualOutputRowsTable({ rows }) {
 }
 
 export default function AdminPage() {
-  const { user, signOut } = useAuth()
+  const { signOut } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -307,14 +308,30 @@ export default function AdminPage() {
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Productivity Tables</h3>
             <div className="grid gap-4 xl:grid-cols-2">
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Geographic Productivity</h3>
-                <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
-              </div>
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Salesperson Productivity</h3>
-                <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
-              </div>
+              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
+                  Geographic Productivity
+                </summary>
+                <div className="mt-3">
+                  <LocationProductivityTable rows={insights?.tables?.locationProductivity} />
+                </div>
+              </details>
+              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
+                  Salesperson Productivity
+                </summary>
+                <div className="mt-3">
+                  <SalespersonProductivityTable rows={insights?.tables?.salespersonProductivity} />
+                </div>
+              </details>
+              <details className="rounded-xl border border-slate-200 bg-white p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-600">
+                  Customer Productivity
+                </summary>
+                <div className="mt-3">
+                  <CustomerProductivityTable rows={insights?.tables?.customerProductivity} />
+                </div>
+              </details>
             </div>
           </div>
 
