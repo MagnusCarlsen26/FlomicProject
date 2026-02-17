@@ -285,4 +285,37 @@ export async function getAdminStage2ActivityCompliance({
   return apiFetch(`/api/admin/stage2-activity-compliance${suffix}`)
 }
 
+export async function getAdminStage3PlannedNotVisited({
+  from,
+  to,
+  week,
+  month,
+  q,
+  salesmen,
+  reasonCategory,
+  customer,
+  mainTeam,
+  team,
+  subTeam,
+} = {}) {
+  const params = new URLSearchParams()
+
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (week) params.set('week', week)
+  if (month) params.set('month', month)
+  if (q) params.set('q', q)
+  if (salesmen && salesmen.length > 0) {
+    params.set('salesmen', Array.isArray(salesmen) ? salesmen.join(',') : salesmen)
+  }
+  if (reasonCategory) params.set('reasonCategory', reasonCategory)
+  if (customer) params.set('customer', customer)
+  if (mainTeam) params.set('mainTeam', mainTeam)
+  if (team) params.set('team', team)
+  if (subTeam) params.set('subTeam', subTeam)
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch(`/api/admin/stage3-planned-not-visited${suffix}`)
+}
+
 export { ApiError }

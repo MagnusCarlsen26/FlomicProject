@@ -29,3 +29,15 @@ export function contactTypeLabel(value) {
 export function visitedLabel(value) {
   return VISITED_OPTIONS.find((option) => option.value === value)?.label || '-'
 }
+
+export const NOT_VISITED_REASON_CATEGORY_OPTIONS = [
+  { value: '', label: 'Select' },
+  { value: 'client_unavailable', label: 'Client Unavailable' },
+  { value: 'no_response', label: 'No Response' },
+  { value: 'internal_engagement', label: 'Internal Engagement' },
+  { value: 'travel_logistics_issue', label: 'Travel/Logistics Issue' },
+]
+
+export function notVisitedReasonCategoryLabel(value) {
+  return NOT_VISITED_REASON_CATEGORY_OPTIONS.find((option) => option.value === value)?.label || value || '-'
+}

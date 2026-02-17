@@ -43,6 +43,48 @@ test('normalizePlanningRows accepts admin id for jsvWithWhom', () => {
   assert.equal(result.rows[0].jsvWithWhom, 'admin-1');
 });
 
+test('normalizeActualOutputRows requires notVisitedReasonCategory when visited is no', () => {
+  const week = { weekStartDateUtc: new Date('2026-02-09T00:00:00.000Z') };
+  const build7 = (row) => [
+    row,
+    ...['2026-02-10', '2026-02-11', '2026-02-12', '2026-02-13', '2026-02-14', '2026-02-15'].map(d => ({ date: d, visited: '' }))
+  ];
+
+  // Missing category for new row
+  const result1 = normalizeActualOutputRows(build7({ date: '2026-02-09', visited: 'no', notVisitedReason: 'text' }), week);
+  assert.match(result1.error, /notVisitedReasonCategory is required/i);
+
+  // Invalid category
+  const result2 = normalizeActualOutputRows(build7({ date: '2026-02-09', visited: 'no', notVisitedReason: 'text', notVisitedReasonCategory: 'invalid' }), week);
+  assert.match(result2.error, /notVisitedReasonCategory is invalid/i);
+
+  // Valid category
+  const result3 = normalizeActualOutputRows(build7({ date: '2026-02-09', visited: 'no', notVisitedReason: 'text', notVisitedReasonCategory: 'client_unavailable' }), week);
+  assert.equal(result3.error, undefined);
+  assert.equal(result3.rows[0].notVisitedReasonCategory, 'client_unavailable');
+});
+
+test('normalizeActualOutputRows allows unchanged legacy row without category', () => {
+  const week = { weekStartDateUtc: new Date('2026-02-09T00:00:00.000Z') };
+  const build7 = (row) => [
+    row,
+    ...['2026-02-10', '2026-02-11', '2026-02-12', '2026-02-13', '2026-02-14', '2026-02-15'].map(d => ({ date: d, visited: '' }))
+  ];
+  const existingRowsByDate = new Map([
+    ['2026-02-09', { visited: 'no', notVisitedReason: 'old reason', notVisitedReasonCategory: '' }]
+  ]);
+
+  const options = { existingRowsByDate, allowLegacyUnchanged: true };
+
+  // Unchanged - should pass
+  const result1 = normalizeActualOutputRows(build7({ date: '2026-02-09', visited: 'no', notVisitedReason: 'old reason' }), week, options);
+  assert.equal(result1.error, undefined);
+
+  // Reason changed - should fail
+  const result2 = normalizeActualOutputRows(build7({ date: '2026-02-09', visited: 'no', notVisitedReason: 'new reason' }), week, options);
+  assert.match(result2.error, /notVisitedReasonCategory is required/i);
+});
+
 test('normalizePlanningRows rejects non-admin jsvWithWhom for new value', () => {
   const week = getWeekParts(new Date('2026-02-11T00:00:00.000Z'));
   const rows = buildDefaultPlanningRows(week).map((row) => ({ ...row }));

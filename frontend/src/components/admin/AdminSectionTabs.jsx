@@ -18,6 +18,9 @@ export default function AdminSectionTabs() {
       <NavLink to="/admin/stage2-activity-compliance" className={getTabClassName}>
         Stage 2
       </NavLink>
+      <NavLink to="/admin/stage3-planned-not-visited" className={getTabClassName}>
+        Stage 3
+      </NavLink>
       <NavLink to="/admin/insights" className={getTabClassName}>
         Insights
       </NavLink>

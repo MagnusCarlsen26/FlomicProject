@@ -21,6 +21,7 @@ import {
 import {
   CONTACT_TYPE_OPTIONS,
   CUSTOMER_TYPE_OPTIONS,
+  NOT_VISITED_REASON_CATEGORY_OPTIONS,
   VISITED_OPTIONS,
 } from '../constants/weeklyReportFields'
 import { formatDateTime, formatSheetDate } from '../utils/dateFormat'
@@ -222,6 +223,19 @@ const ActualOutputRow = memo(function ActualOutputRow({ row, index, updateRow, d
         />
       </td>
       <td>
+        <Select
+          value={row.notVisitedReasonCategory || ''}
+          onChange={(event) => updateRow(index, 'notVisitedReasonCategory', event.target.value)}
+          disabled={disabled || row.visited !== 'no'}
+        >
+          {NOT_VISITED_REASON_CATEGORY_OPTIONS.map((option) => (
+            <option key={option.value || 'empty'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
         <Input
           type="number"
           min="0"
@@ -259,6 +273,7 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
 
           if (field === 'visited' && value !== 'no') {
             nextRow.notVisitedReason = ''
+            nextRow.notVisitedReasonCategory = ''
           }
 
           if (field === 'enquiriesReceived' || field === 'shipmentsConverted') {
@@ -281,6 +296,7 @@ function ActualOutputTableEditor({ rows, setRows, disabled }) {
             <th>Date</th>
             <th>Visited</th>
             <th>Reason not visited</th>
+            <th>Not Visited Category</th>
             <th>Enquiries</th>
             <th>Shipments Converted</th>
           </tr>

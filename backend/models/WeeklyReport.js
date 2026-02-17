@@ -69,6 +69,11 @@ const actualOutputRowSchema = new mongoose.Schema(
       trim: true,
       maxlength: 1000,
     },
+    notVisitedReasonCategory: {
+      type: String,
+      enum: ['', 'client_unavailable', 'no_response', 'internal_engagement', 'travel_logistics_issue'],
+      default: '',
+    },
     enquiriesReceived: {
       type: Number,
       default: 0,

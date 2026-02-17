@@ -19,6 +19,7 @@ const { getWeekParts, resolveWeekFromQuery } = require('./utils/week');
 const { buildInsightsPayload, resolveInsightsRange } = require('./utils/adminInsights');
 const { buildStage1Payload, resolveStage1Range } = require('./utils/stage1PlanActual');
 const { buildStage2Payload, resolveStage2Range } = require('./utils/stage2ActivityCompliance');
+const { buildStage3Payload, resolveStage3Range } = require('./utils/stage3PlannedNotVisited');
 const { buildInactiveAlert, buildJsvRepeatAlertsBySalesman } = require('./utils/jsvRepeatAlerts');
 const {
   buildDefaultActualOutputRows,
@@ -437,13 +438,16 @@ app.put('/api/salesman/actual-output', requireAuth, requireRole('salesman', 'adm
     });
   }
 
-  const normalizedResult = normalizeActualOutputRows(rows, currentWeek);
-  if (normalizedResult.error) {
-    return res.status(400).json({ message: normalizedResult.error });
-  }
-
   try {
     const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
+    const normalizedResult = normalizeActualOutputRows(rows, currentWeek, {
+      existingRowsByDate: toExistingRowsByDate(report.actualOutputRows || []),
+      allowLegacyUnchanged: true,
+    });
+    if (normalizedResult.error) {
+      return res.status(400).json({ message: normalizedResult.error });
+    }
+
     report.actualOutputRows = normalizedResult.rows;
     report.actualOutputUpdatedAt = new Date();
     await report.save();
@@ -457,6 +461,81 @@ app.put('/api/salesman/actual-output', requireAuth, requireRole('salesman', 'adm
   } catch (error) {
     console.error('Actual output update error:', error);
     return res.status(500).json({ message: 'Unable to update actual output rows' });
+  }
+});
+
+app.get('/api/admin/stage3-planned-not-visited', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const rangeResult = resolveStage3Range(req.query || {});
+  if (rangeResult.error) {
+    return res.status(400).json({ message: rangeResult.error });
+  }
+
+  const salesmen = String(req.query?.salesmen || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const reasonCategory = String(req.query?.reasonCategory || '').trim().toLowerCase();
+  const customer = String(req.query?.customer || '').trim();
+  const mainTeam = String(req.query?.mainTeam || '').trim();
+  const team = String(req.query?.team || '').trim();
+  const subTeam = String(req.query?.subTeam || '').trim();
+  const q = String(req.query?.q || '').trim();
+
+  try {
+    const userQuery = { role: { $in: ['salesman', 'admin'] } };
+    if (q) {
+      const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedQ, 'i');
+      userQuery.$or = [{ name: regex }, { email: regex }];
+    }
+
+    const users = await User.find(userQuery)
+      .select('_id name email mainTeam team subTeam')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    const userIds = users.map((u) => u._id);
+
+    // To detect recurrence, we need more history than just the selected range.
+    // We fetch reports starting from 8 weeks before range start.
+    const fromDateObj = new Date(`${rangeResult.fromDate}T00:00:00.000Z`);
+    const windowStartDate = new Date(fromDateObj.getTime() - 8 * 7 * 24 * 60 * 60 * 1000);
+
+    const reports =
+      userIds.length === 0
+        ? []
+        : await WeeklyReport.find({
+            salesmanId: { $in: userIds },
+            weekStartDateUtc: {
+              $gte: windowStartDate,
+              $lte: new Date(`${rangeResult.toDate}T23:59:59.999Z`),
+            },
+          })
+            .select('salesmanId planningRows actualOutputRows weekKey weekStartDateUtc')
+            .lean();
+
+    const payload = buildStage3Payload({
+      users,
+      reports,
+      range: rangeResult,
+      filters: {
+        salesmen,
+        reasonCategory,
+        customer,
+        mainTeam,
+        team,
+        subTeam,
+      },
+    });
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('Stage 3 planned-not-visited fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch stage 3 data' });
   }
 });
 
