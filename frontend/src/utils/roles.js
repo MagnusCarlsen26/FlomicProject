@@ -36,7 +36,7 @@ export function getDefaultRoute(user) {
   }
 
   if (hasRole(user, 'admin')) {
-    return '/admin/stage1-plan-actual'
+    return '/admin'
   }
 
   return '/login'

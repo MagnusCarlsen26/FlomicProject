@@ -14,7 +14,6 @@ function getNavItems(user) {
   }
 
   if (hasRole(user, 'admin')) {
-    items.push({ to: '/admin/stage1-plan-actual', label: 'Stage 1' })
     items.push({ to: '/admin/insights', label: 'Insights' })
     items.push({ to: '/admin/salesmen-status', label: 'Salesmen Status' })
   }
