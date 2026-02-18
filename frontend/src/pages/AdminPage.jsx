@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import InsightCard from '../components/admin/InsightCard'
+import Stage3PlannedNotVisitedSection from '../components/admin/Stage3PlannedNotVisitedSection'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
 import Alert from '../components/ui/Alert'
@@ -719,6 +720,7 @@ export default function AdminPage() {
         </GlassCard>
 
         <UnifiedAdminSection />
+        <Stage3PlannedNotVisitedSection />
       </PageSurface>
     </PageEnter>
   )

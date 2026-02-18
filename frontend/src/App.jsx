@@ -65,8 +65,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route element={<AppShell />}>
-          <Route path="/admin" element={<Navigate to="/admin/stage3-planned-not-visited" replace />} />
-          <Route path="/admin/stage3-planned-not-visited" element={<AdminStage3PlannedNotVisitedPage />} />
+          <Route path="/admin" element={<Navigate to="/admin/insights" replace />} />
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
         </Route>
