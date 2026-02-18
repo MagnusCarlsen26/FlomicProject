@@ -5,7 +5,6 @@ import PageEnter from './components/motion/PageEnter'
 import { useAuth } from './context/useAuth'
 import LoginPage from './pages/LoginPage'
 import SalesmanPage from './pages/SalesmanPage'
-import AdminPage from './pages/AdminPage'
 import AdminInsightsPage from './pages/AdminInsightsPage'
 import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
 import { getDefaultRoute } from './utils/roles'
@@ -65,7 +64,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route element={<AppShell />}>
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<Navigate to="/admin/insights" replace />} />
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/salesmen-status" element={<AdminSalesmenStatusPage />} />
         </Route>
