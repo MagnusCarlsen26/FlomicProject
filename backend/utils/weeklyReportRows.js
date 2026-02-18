@@ -31,6 +31,7 @@ function buildDefaultActualOutputRow(date) {
     isoWeek: parseIsoWeekNumber(getIsoWeekStringFromDate(new Date(`${date}T00:00:00.000Z`))),
     visited: '',
     notVisitedReason: '',
+    notVisitedReasonCategory: '',
     enquiriesReceived: 0,
     shipmentsConverted: 0,
   };
@@ -164,7 +165,11 @@ function normalizePlanningRows(rows, week, options = {}) {
   return { rows: normalizedRows };
 }
 
-function normalizeActualOutputRows(rows, week) {
+function normalizeActualOutputRows(rows, week, options = {}) {
+  const {
+    existingRowsByDate = null,
+    allowLegacyUnchanged = false,
+  } = options;
   const envelopeError = validateRowsEnvelope(rows, 'actualOutput.rows');
   if (envelopeError) {
     return { error: envelopeError };
@@ -173,6 +178,14 @@ function normalizeActualOutputRows(rows, week) {
   const defaults = buildDefaultActualOutputRows(week);
   const dateSet = new Set(defaults.map((row) => row.date));
   const normalizedByDate = new Map();
+
+  const VALID_CATEGORIES = new Set([
+    '',
+    'client_unavailable',
+    'no_response',
+    'internal_engagement',
+    'travel_logistics_issue',
+  ]);
 
   for (let index = 0; index < rows.length; index += 1) {
     const input = rows[index];
@@ -195,8 +208,34 @@ function normalizeActualOutputRows(rows, week) {
     }
 
     const notVisitedReason = String(input.notVisitedReason || '').trim().slice(0, 1000);
-    if (visited === 'no' && !notVisitedReason) {
-      return { error: `actualOutput.rows[${index}].notVisitedReason is required when visited is no` };
+    const notVisitedReasonCategory = String(input.notVisitedReasonCategory || '').trim().toLowerCase();
+
+    if (visited === 'no') {
+      if (!notVisitedReason) {
+        return { error: `actualOutput.rows[${index}].notVisitedReason is required when visited is no` };
+      }
+
+      if (!VALID_CATEGORIES.has(notVisitedReasonCategory)) {
+        return { error: `actualOutput.rows[${index}].notVisitedReasonCategory is invalid` };
+      }
+
+      if (!notVisitedReasonCategory) {
+        // Check for legacy exception
+        const existingRow = existingRowsByDate instanceof Map ? existingRowsByDate.get(date) : null;
+        const existingCategory = String(existingRow?.notVisitedReasonCategory || '').trim();
+        const existingReason = String(existingRow?.notVisitedReason || '').trim();
+        const existingVisited = String(existingRow?.visited || '').trim().toLowerCase();
+
+        const isUnchangedLegacy =
+          allowLegacyUnchanged === true &&
+          existingVisited === 'no' &&
+          !existingCategory &&
+          existingReason === notVisitedReason;
+
+        if (!isUnchangedLegacy) {
+          return { error: `actualOutput.rows[${index}].notVisitedReasonCategory is required when visited is no` };
+        }
+      }
     }
 
     const enquiriesResult = parseNonNegativeInteger(input.enquiriesReceived, 'enquiriesReceived');
@@ -214,6 +253,7 @@ function normalizeActualOutputRows(rows, week) {
       isoWeek: parseIsoWeekNumber(getIsoWeekStringFromDate(new Date(`${date}T00:00:00.000Z`))),
       visited,
       notVisitedReason: visited === 'no' ? notVisitedReason : '',
+      notVisitedReasonCategory: visited === 'no' ? notVisitedReasonCategory : '',
       enquiriesReceived: enquiriesResult.value,
       shipmentsConverted: shipmentsResult.value,
     };
