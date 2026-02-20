@@ -27,7 +27,7 @@ const planningRowSchema = new mongoose.Schema(
     },
     customerType: {
       type: String,
-      enum: ['', 'targeted_budgeted', 'existing'],
+      enum: ['', 'targeted_budgeted', 'target_budgeted', 'new_customer_non_budgeted', 'existing'],
       default: '',
     },
     contactType: {

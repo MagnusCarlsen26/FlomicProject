@@ -325,6 +325,7 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
   isEditable,
   error,
   successMessage,
+  savingStatusMessage,
   loading,
   onRefresh,
 }) {
@@ -372,6 +373,7 @@ const SalesmanHeaderCard = memo(function SalesmanHeaderCard({
 
       <div className="mt-5 space-y-3">
         {!isEditable ? <Alert tone="warning">Editing is locked because the IST week has ended.</Alert> : null}
+        {savingStatusMessage ? <Alert tone="warning">{savingStatusMessage}</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
         {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
       </div>
@@ -394,6 +396,11 @@ export default function SalesmanPage() {
 
   const [savingActual, setSavingActual] = useState(false)
   const [savingPlanning, setSavingPlanning] = useState(false)
+  const savingStatusMessage = savingPlanning
+    ? 'Saving planning changes...'
+    : savingActual
+      ? 'Saving actual output changes...'
+      : ''
 
   const loadCurrentWeek = useCallback(async () => {
     setLoading(true)
@@ -432,7 +439,7 @@ export default function SalesmanPage() {
     setSuccessMessage(null)
 
     try {
-      const data = await updateSalesmanPlanning({ weekKey: week.key, rows: planningRows })
+      const data = await updateSalesmanPlanning({ weekKey: week.key, rows: planningRows, submitted: true })
       setPlanningRows(data?.planning?.rows || [])
       setPlanningSubmittedAt(data?.planning?.submittedAt || null)
       setSuccessMessage('Planning saved successfully.')
@@ -475,6 +482,7 @@ export default function SalesmanPage() {
           isEditable={isEditable}
           error={error}
           successMessage={successMessage}
+          savingStatusMessage={savingStatusMessage}
           loading={loading}
           onRefresh={loadCurrentWeek}
         />

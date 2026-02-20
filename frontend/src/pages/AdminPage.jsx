@@ -43,10 +43,8 @@ const SECTION_TITLES = {
   'visit-performance': 'Visit Performance',
   'compliance-snapshot': 'Compliance Snapshot',
   'daily-trend': 'Daily Trend',
-  'weekly-summary': 'Weekly Summary',
-  'monthly-rollup': 'Monthly Rollup',
-  'top-over-achievers': 'Top Over-Achievers',
-  'top-under-achievers': 'Top Under-Achievers',
+  'weekly-monthly-summary': 'Weekly & Monthly Summary',
+  'top-achievers-summary': 'Achivers',
   'call-type-split': 'Call Type Split',
   'customer-type-split': 'Customer Type Split',
   'compliance-by-salesperson': 'Subteam Member JSV Compliance',
@@ -59,7 +57,8 @@ function formatCallType(callType) {
 }
 
 function formatCustomerType(customerType) {
-  if (customerType === 'targeted_budgeted') return 'Targeted (Budgeted)'
+  if (customerType === 'targeted_budgeted' || customerType === 'target_budgeted') return 'Target (Budgeted)'
+  if (customerType === 'new_customer_non_budgeted') return 'New Customer (Non Budgeted)'
   if (customerType === 'existing') return 'Existing'
   return 'Unknown'
 }
@@ -212,6 +211,7 @@ function UnifiedAdminSection() {
   const [month, setMonth] = useState('')
   const [callType, setCallType] = useState('')
   const [customerType, setCustomerType] = useState('')
+  const [moreInsightsSearch, setMoreInsightsSearch] = useState('')
 
   const [appliedFilters, setAppliedFilters] = useState({})
   const fetchCounterRef = useRef(0)
@@ -415,6 +415,27 @@ function UnifiedAdminSection() {
 
   const visitDrilldownRows = useMemo(() => (planActualData?.drilldownRows || []).slice(0, 25), [planActualData])
   const activityDrilldownRows = useMemo(() => (activityData?.drilldown || []).slice(0, 25), [activityData])
+  const normalizedMoreInsightsSearch = moreInsightsSearch.trim().toLowerCase()
+  const filteredSalespersonRollupRows = useMemo(() => {
+    const rows = planActualData?.hierarchyRollups?.salesperson || []
+    if (!normalizedMoreInsightsSearch) return rows
+
+    return rows.filter((row) =>
+      Object.values(row || {}).some((value) => String(value ?? '').toLowerCase().includes(normalizedMoreInsightsSearch)),
+    )
+  }, [normalizedMoreInsightsSearch, planActualData])
+  const filteredVisitDrilldownRows = useMemo(() => {
+    if (!normalizedMoreInsightsSearch) return visitDrilldownRows
+    return visitDrilldownRows.filter((row) =>
+      JSON.stringify(row || {}).toLowerCase().includes(normalizedMoreInsightsSearch),
+    )
+  }, [normalizedMoreInsightsSearch, visitDrilldownRows])
+  const filteredActivityDrilldownRows = useMemo(() => {
+    if (!normalizedMoreInsightsSearch) return activityDrilldownRows
+    return activityDrilldownRows.filter((row) =>
+      JSON.stringify(row || {}).toLowerCase().includes(normalizedMoreInsightsSearch),
+    )
+  }, [activityDrilldownRows, normalizedMoreInsightsSearch])
   const dailyTrendRows = useMemo(
     () => (planActualData?.dailyTrend || []).map((row) => ({ ...row, dateLabel: formatMonthDayLabel(row.date) })),
     [planActualData],
@@ -500,20 +521,20 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'weekly-summary',
+        id: 'weekly-monthly-summary',
         render: () => (
           <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Summary</h2>
-            <MetricsTable rows={weeklySummaryRows} labelKey="weekLabel" labelTitle="Week" />
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'monthly-rollup',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Monthly Rollup</h2>
-            <MetricsTable rows={monthlyRollupRows} labelKey="monthLabel" labelTitle="Month" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly & Monthly Summary</h2>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">Weekly Summary</h3>
+                <MetricsTable rows={weeklySummaryRows} labelKey="weekLabel" labelTitle="Week" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">Monthly Rollup</h3>
+                <MetricsTable rows={monthlyRollupRows} labelKey="monthLabel" labelTitle="Month" />
+              </div>
+            </div>
           </GlassCard>
         ),
       },
@@ -536,20 +557,20 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'top-over-achievers',
+        id: 'top-achievers-summary',
         render: () => (
           <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Over-Achievers</h2>
-            <MetricsTable rows={planActualData?.topPerformers?.overAchievers || []} labelKey="name" labelTitle="Salesperson" />
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'top-under-achievers',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Under-Achievers</h2>
-            <MetricsTable rows={planActualData?.topPerformers?.underAchievers || []} labelKey="name" labelTitle="Salesperson" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Achivers</h2>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="space-y-2 rounded-2xl border border-success/40 bg-success-soft/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-success">Top Over-Achievers</h3>
+                <MetricsTable rows={planActualData?.topPerformers?.overAchievers || []} labelKey="name" labelTitle="Salesperson" />
+              </div>
+              <div className="space-y-2 rounded-2xl border border-error/40 bg-error-soft/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-error">Top Under-Achievers</h3>
+                <MetricsTable rows={planActualData?.topPerformers?.underAchievers || []} labelKey="name" labelTitle="Salesperson" />
+              </div>
+            </div>
           </GlassCard>
         ),
       },
@@ -601,6 +622,13 @@ function UnifiedAdminSection() {
         render: () => (
           <GlassCard className="space-y-4">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">More Insights</h2>
+            <Input
+              type="search"
+              value={moreInsightsSearch}
+              onChange={(event) => setMoreInsightsSearch(event.target.value)}
+              placeholder="Search across all More Insights tables"
+              aria-label="Search rows across More Insights tables"
+            />
 
             <CollapsibleInsightsTable title="Salesperson Performance Rollup">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
@@ -618,7 +646,7 @@ function UnifiedAdminSection() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(planActualData?.hierarchyRollups?.salesperson || []).map((row) => (
+                    {filteredSalespersonRollupRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.name || row.email}</td>
                         <td>{row.mainTeam || '-'}</td>
@@ -630,6 +658,13 @@ function UnifiedAdminSection() {
                         <td>{formatPercent(row.achievementRate)}</td>
                       </tr>
                     ))}
+                    {!filteredSalespersonRollupRows.length ? (
+                      <tr>
+                        <td colSpan={8} className="py-4 text-center text-text-secondary">
+                          No matching rows found.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </DataTableFrame>
@@ -651,7 +686,7 @@ function UnifiedAdminSection() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visitDrilldownRows.map((row, index) => (
+                    {filteredVisitDrilldownRows.map((row, index) => (
                       <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
                         <td>{row.date || '-'}</td>
                         <td>{row.isoWeek || '-'}</td>
@@ -663,7 +698,7 @@ function UnifiedAdminSection() {
                         <td>{row.visited ? 'Visited' : 'Planned only'}</td>
                       </tr>
                     ))}
-                    {activityDrilldownRows.map((row, index) => (
+                    {filteredActivityDrilldownRows.map((row, index) => (
                       <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
                         <td>{row.date || '-'}</td>
                         <td>{week || '-'}</td>
@@ -675,6 +710,13 @@ function UnifiedAdminSection() {
                         <td>{row.type ? 'Logged' : '-'}</td>
                       </tr>
                     ))}
+                    {!filteredVisitDrilldownRows.length && !filteredActivityDrilldownRows.length ? (
+                      <tr>
+                        <td colSpan={8} className="py-4 text-center text-text-secondary">
+                          No matching rows found.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </DataTableFrame>
@@ -686,7 +728,6 @@ function UnifiedAdminSection() {
     ],
     [
       activityData,
-      activityDrilldownRows,
       callTypeRows,
       customerTypeRows,
       dataErrors.activityCompliance,
@@ -694,9 +735,12 @@ function UnifiedAdminSection() {
       dataErrors.stage3,
       dailyTrendRows,
       monthlyRollupRows,
+      moreInsightsSearch,
       planActualData,
       stage3Data,
-      visitDrilldownRows,
+      filteredSalespersonRollupRows,
+      filteredVisitDrilldownRows,
+      filteredActivityDrilldownRows,
       weeklySummaryRows,
       week,
       chartTheme,

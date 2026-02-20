@@ -1,7 +1,8 @@
 export const CUSTOMER_TYPE_OPTIONS = [
   { value: '', label: 'Select' },
-  { value: 'targeted_budgeted', label: 'Targeted (Budgeted)' },
   { value: 'existing', label: 'Existing' },
+  { value: 'target_budgeted', label: 'Target (Budgeted)' },
+  { value: 'new_customer_non_budgeted', label: 'New Customer (Non Budgeted)' },
 ]
 
 export const CONTACT_TYPE_OPTIONS = [
@@ -19,6 +20,7 @@ export const VISITED_OPTIONS = [
 ]
 
 export function customerTypeLabel(value) {
+  if (value === 'targeted_budgeted') return 'Target (Budgeted)'
   return CUSTOMER_TYPE_OPTIONS.find((option) => option.value === value)?.label || '-'
 }
 

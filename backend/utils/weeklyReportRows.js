@@ -1,6 +1,6 @@
 const { formatDateKey, getIsoWeekStringFromDate } = require('./week');
 
-const CUSTOMER_TYPES = new Set(['', 'targeted_budgeted', 'existing']);
+const CUSTOMER_TYPES = new Set(['', 'targeted_budgeted', 'target_budgeted', 'new_customer_non_budgeted', 'existing']);
 const CONTACT_TYPES = new Set(['', 'nc', 'fc', 'sc', 'jsv']);
 const VISITED_VALUES = new Set(['', 'yes', 'no']);
 
@@ -117,7 +117,7 @@ function normalizePlanningRows(rows, week, options = {}) {
     if (!CUSTOMER_TYPES.has(customerType)) {
       return {
         error:
-          'planning.rows customerType must be one of: targeted_budgeted, existing, or blank',
+          'planning.rows customerType must be one of: existing, target_budgeted, new_customer_non_budgeted, targeted_budgeted, or blank',
       };
     }
 

@@ -1,7 +1,7 @@
 const { IST_TIME_ZONE, formatDateKey, resolveWeekFromQuery } = require('./week');
 
 const VALID_CONTACT_TYPES = new Set(['nc', 'fc', 'jsv', 'sc']);
-const VALID_CUSTOMER_TYPES = new Set(['targeted_budgeted', 'existing']);
+const VALID_CUSTOMER_TYPES = new Set(['targeted_budgeted', 'target_budgeted', 'new_customer_non_budgeted', 'existing']);
 const MAX_RANGE_DAYS = 370;
 
 function safeDivide(numerator, denominator) {
@@ -169,6 +169,9 @@ function normalizeContactType(value) {
 
 function normalizeCustomerType(value) {
   const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'targeted_budgeted') {
+    return 'target_budgeted';
+  }
   return VALID_CUSTOMER_TYPES.has(normalized) ? normalized : '';
 }
 
@@ -294,7 +297,8 @@ function buildStage1Payload({ users, reports, range, filters }) {
     ['unknown', createMetricAccumulator()],
   ]);
   const customerTypeSummary = new Map([
-    ['targeted_budgeted', createMetricAccumulator()],
+    ['target_budgeted', createMetricAccumulator()],
+    ['new_customer_non_budgeted', createMetricAccumulator()],
     ['existing', createMetricAccumulator()],
     ['unknown', createMetricAccumulator()],
   ]);
@@ -501,7 +505,7 @@ function buildStage1Payload({ users, reports, range, filters }) {
       team: Array.from(teamSet).sort((a, b) => a.localeCompare(b)),
       subTeam: Array.from(subTeamSet).sort((a, b) => a.localeCompare(b)),
       callType: ['nc', 'fc', 'jsv', 'sc', 'unknown'],
-      customerType: ['targeted_budgeted', 'existing'],
+      customerType: ['existing', 'target_budgeted', 'new_customer_non_budgeted'],
       teamHierarchy: Object.fromEntries(
         Array.from(teamToSubTeamsMap.entries()).map(([team, subTeams]) => [
           team,

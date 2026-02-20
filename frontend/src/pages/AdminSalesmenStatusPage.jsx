@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
+import Input from '../components/ui/Input'
 import { getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
 import { formatDateTime, formatSheetDate, getErrorMessage } from './adminUtils'
@@ -94,6 +95,7 @@ export default function AdminSalesmenStatusPage() {
   const [lastPolledAt, setLastPolledAt] = useState(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[1])
+  const [searchQuery, setSearchQuery] = useState('')
   const fetchCounterRef = useRef(0)
 
   const fetchStatus = useCallback(
@@ -143,15 +145,20 @@ export default function AdminSalesmenStatusPage() {
     fetchStatus()
   }, [fetchStatus])
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+  const filteredEntries = normalizedSearchQuery
+    ? entries.filter((entry) => JSON.stringify(entry || {}).toLowerCase().includes(normalizedSearchQuery))
+    : entries
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
   const clampedPage = Math.min(page, totalPages)
-  const paginatedEntries = entries.slice((clampedPage - 1) * pageSize, clampedPage * pageSize)
-  const rangeStart = entries.length === 0 ? 0 : (clampedPage - 1) * pageSize + 1
-  const rangeEnd = entries.length === 0 ? 0 : Math.min(clampedPage * pageSize, entries.length)
+  const paginatedEntries = filteredEntries.slice((clampedPage - 1) * pageSize, clampedPage * pageSize)
+  const rangeStart = filteredEntries.length === 0 ? 0 : (clampedPage - 1) * pageSize + 1
+  const rangeEnd = filteredEntries.length === 0 ? 0 : Math.min(clampedPage * pageSize, filteredEntries.length)
 
   useEffect(() => {
     setPage(1)
-  }, [entries.length, pageSize])
+  }, [filteredEntries.length, pageSize])
 
   return (
     <PageEnter>
@@ -172,8 +179,18 @@ export default function AdminSalesmenStatusPage() {
           </div>
 
           <p className="mt-3 text-sm text-text-secondary">
-            Showing {rangeStart}-{rangeEnd} of {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}
+            Showing {rangeStart}-{rangeEnd} of {filteredEntries.length} salesmen
+            {normalizedSearchQuery ? ` (filtered from ${total})` : ''}. Last refresh: {formatDateTime(lastPolledAt)}
           </p>
+          <div className="mt-3">
+            <Input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search salesmen, planning, and actual output"
+              aria-label="Search salesmen status"
+            />
+          </div>
 
           <div className="mt-4 space-y-3">
             {error ? <Alert tone="error">{error}</Alert> : null}
@@ -184,9 +201,9 @@ export default function AdminSalesmenStatusPage() {
         <section className="space-y-3">
           {loading ? <p className="text-sm text-text-secondary">Loading status...</p> : null}
 
-          {!loading && entries.length === 0 ? (
+          {!loading && filteredEntries.length === 0 ? (
             <GlassCard>
-              <p className="text-sm text-text-secondary">No salesmen found for the selected filters.</p>
+              <p className="text-sm text-text-secondary">No salesmen found.</p>
             </GlassCard>
           ) : null}
 
@@ -227,7 +244,7 @@ export default function AdminSalesmenStatusPage() {
           ))}
         </section>
 
-        {!loading && entries.length > 0 ? (
+        {!loading && filteredEntries.length > 0 ? (
           <GlassCard>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-text-secondary">

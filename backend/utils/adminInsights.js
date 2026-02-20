@@ -148,7 +148,11 @@ function normalizeContactType(value) {
 
 function normalizeCustomerSegment(customerType) {
   const normalized = String(customerType || '').trim().toLowerCase();
-  if (normalized === 'targeted_budgeted') {
+  if (
+    normalized === 'targeted_budgeted' ||
+    normalized === 'target_budgeted' ||
+    normalized === 'new_customer_non_budgeted'
+  ) {
     return 'new';
   }
   if (normalized === 'existing') {
