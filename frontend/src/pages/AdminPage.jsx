@@ -10,8 +10,11 @@ import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import MultiSelect from '../components/ui/MultiSelect'
+import Select from '../components/ui/Select'
 import { getAdminStage1PlanActual, getAdminStage2ActivityCompliance } from '../services/api'
-import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
+import { formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
+
+const ADMIN_TABLE_FRAME_CLASS = 'max-h-[34rem] overflow-y-auto'
 
 function formatCallType(callType) {
   if (!callType) return 'Unknown'
@@ -30,7 +33,7 @@ function MetricsTable({ rows, labelKey, labelTitle }) {
   }
 
   return (
-    <DataTableFrame>
+    <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
       <table className="table-core min-w-full text-sm">
         <thead>
           <tr>
@@ -188,22 +191,6 @@ function UnifiedAdminSection() {
     fetchData()
   }, [fetchData])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') fetchData({ silent: true })
-    }, POLL_INTERVAL_MS)
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') fetchData({ silent: true })
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-  }, [fetchData])
-
   const planActualData = combinedData.planActual
   const activityData = combinedData.activityCompliance
 
@@ -356,8 +343,7 @@ function UnifiedAdminSection() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Main Team</label>
-            <select
-              className="input-core"
+            <Select
               value={mainTeam}
               onChange={(e) => {
                 setMainTeam(e.target.value)
@@ -372,12 +358,11 @@ function UnifiedAdminSection() {
                   {item}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Team</label>
-            <select
-              className="input-core"
+            <Select
               value={team}
               onChange={(e) => {
                 setTeam(e.target.value)
@@ -391,12 +376,11 @@ function UnifiedAdminSection() {
                   {item}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Sub Team</label>
-            <select
-              className="input-core"
+            <Select
               value={subTeam}
               onChange={(e) => {
                 setSubTeam(e.target.value)
@@ -409,7 +393,7 @@ function UnifiedAdminSection() {
                   {item}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -428,25 +412,25 @@ function UnifiedAdminSection() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Call Type</label>
-            <select className="input-core" value={callType} onChange={(e) => setCallType(e.target.value)}>
+            <Select value={callType} onChange={(e) => setCallType(e.target.value)}>
               <option value="">All</option>
               {mergedFilterOptions.callType.map((item) => (
                 <option key={item} value={item}>
                   {formatCallType(item)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Customer Type</label>
-            <select className="input-core" value={customerType} onChange={(e) => setCustomerType(e.target.value)}>
+            <Select value={customerType} onChange={(e) => setCustomerType(e.target.value)}>
               <option value="">All</option>
               {mergedFilterOptions.customerType.map((item) => (
                 <option key={item} value={item}>
                   {formatCustomerType(item)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5 flex items-end gap-2">
@@ -543,7 +527,7 @@ function UnifiedAdminSection() {
 
       <GlassCard className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h2>
-        <DataTableFrame>
+        <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
           <table className="table-core min-w-full text-sm">
             <thead>
               <tr>
@@ -578,7 +562,7 @@ function UnifiedAdminSection() {
       <div className="grid gap-4 xl:grid-cols-2">
         <GlassCard className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance by Salesperson</h2>
-          <DataTableFrame>
+          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
             <table className="table-core min-w-full text-sm">
               <thead>
                 <tr>
@@ -618,7 +602,7 @@ function UnifiedAdminSection() {
 
         <GlassCard className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Admin Monitoring</h2>
-          <DataTableFrame>
+          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
             <table className="table-core min-w-full text-sm">
               <thead>
                 <tr>
@@ -662,7 +646,7 @@ function UnifiedAdminSection() {
 
       <GlassCard className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h2>
-        <DataTableFrame>
+        <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
           <table className="table-core min-w-full text-sm">
             <thead>
               <tr>

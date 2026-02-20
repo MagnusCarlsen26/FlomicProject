@@ -7,7 +7,6 @@ import LoginPage from './pages/LoginPage'
 import SalesmanPage from './pages/SalesmanPage'
 import AdminInsightsPage from './pages/AdminInsightsPage'
 import AdminSalesmenStatusPage from './pages/AdminSalesmenStatusPage'
-import AdminStage3PlannedNotVisitedPage from './pages/AdminStage3PlannedNotVisitedPage'
 import { getDefaultRoute } from './utils/roles'
 
 function LoadingScreen() {

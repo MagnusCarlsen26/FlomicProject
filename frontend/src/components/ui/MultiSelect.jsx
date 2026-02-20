@@ -37,9 +37,9 @@ export default function MultiSelect({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex min-h-[42px] w-full items-center justify-between rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/70"
+        className="flex min-h-[42px] w-full items-center justify-between rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
       >
-        <span className="block truncate text-left">
+        <span className={cn('block truncate text-left', selectedLabels.length === 0 && 'text-text-muted')}>
           {selectedLabels.length > 0 ? selectedLabels.join(', ') : placeholder}
         </span>
         <svg
@@ -53,14 +53,14 @@ export default function MultiSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-border bg-surface p-1 shadow-lg backdrop-blur-md">
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-border bg-surface p-1 shadow-lg">
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-text-muted text-center">No options available</div>
+            <div className="px-3 py-2 text-center text-sm text-text-muted">No options available</div>
           ) : (
             options.map((option) => (
               <label
                 key={option.id}
-                className="flex cursor-pointer items-center rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors"
+                className="flex cursor-pointer items-center rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-muted"
               >
                 <input
                   type="checkbox"

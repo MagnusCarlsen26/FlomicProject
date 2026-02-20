@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { getAdminStage3PlannedNotVisited } from '../../services/api'
 import { notVisitedReasonCategoryLabel } from '../../constants/weeklyReportFields'
-import { POLL_INTERVAL_MS, formatDateTime, formatPercent, getErrorMessage } from '../../pages/adminUtils'
+import { formatDateTime, formatPercent, getErrorMessage } from '../../pages/adminUtils'
 import InsightCard from './InsightCard'
 import Alert from '../ui/Alert'
 import Badge from '../ui/Badge'
@@ -10,6 +10,7 @@ import DataTableFrame from '../ui/DataTableFrame'
 import GlassCard from '../ui/GlassCard'
 
 const COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8']
+const ADMIN_TABLE_FRAME_CLASS = 'max-h-[34rem] overflow-y-auto'
 
 export default function Stage3PlannedNotVisitedSection() {
   const [error, setError] = useState(null)
@@ -43,26 +44,6 @@ export default function Stage3PlannedNotVisitedSection() {
       fetchData()
     }, 0)
     return () => clearTimeout(timer)
-  }, [fetchData])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchData({ silent: true })
-      }
-    }, POLL_INTERVAL_MS)
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchData({ silent: true })
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
   }, [fetchData])
 
   const weeklyTrend = data?.weeklyTrend || []
@@ -134,7 +115,7 @@ export default function Stage3PlannedNotVisitedSection() {
       <div className="grid gap-4 xl:grid-cols-2">
         <GlassCard className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Non-Visit Rates</h2>
-          <DataTableFrame>
+          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
             <table className="table-core min-w-full text-sm">
               <thead>
                 <tr>
@@ -163,7 +144,7 @@ export default function Stage3PlannedNotVisitedSection() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Repeated Non-Visits (Last 8 Weeks)</h2>
             <Badge tone="warning">Threshold: &ge; 2 weeks</Badge>
           </div>
-          <DataTableFrame>
+          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
             <table className="table-core min-w-full text-sm">
               <thead>
                 <tr>
@@ -192,7 +173,7 @@ export default function Stage3PlannedNotVisitedSection() {
 
       <GlassCard className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Detailed Drilldown (Top 100)</h2>
-        <DataTableFrame>
+        <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
           <table className="table-core min-w-full text-sm">
             <thead>
               <tr>

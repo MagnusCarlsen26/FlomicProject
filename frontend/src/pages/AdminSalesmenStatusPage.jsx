@@ -8,7 +8,7 @@ import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
 import { getAdminSalesmenStatus } from '../services/api'
 import { contactTypeLabel, customerTypeLabel, visitedLabel } from '../constants/weeklyReportFields'
-import { POLL_INTERVAL_MS, formatDateTime, formatSheetDate, getErrorMessage } from './adminUtils'
+import { formatDateTime, formatSheetDate, getErrorMessage } from './adminUtils'
 
 function PlanningRowsTable({ rows }) {
   if (!rows?.length) {
@@ -138,26 +138,6 @@ export default function AdminSalesmenStatusPage() {
 
   useEffect(() => {
     fetchStatus()
-  }, [fetchStatus])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchStatus({ silent: true })
-      }
-    }, POLL_INTERVAL_MS)
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchStatus({ silent: true })
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
   }, [fetchStatus])
 
   return (
