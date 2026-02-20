@@ -52,7 +52,7 @@ const SECTION_TITLES = {
   'top-under-achievers': 'Top Under-Achievers',
   'call-type-split': 'Call Type Split',
   'customer-type-split': 'Customer Type Split',
-  'compliance-by-salesperson': 'Compliance by Salesperson',
+  'compliance-by-salesperson': 'Subteam Member JSV Compliance',
   'more-insights': 'More Insights',
 }
 
@@ -107,16 +107,18 @@ function StatusChip({ severity }) {
   return <span className={`${base} border-success/40 bg-success-soft text-success`}>Compliant</span>
 }
 
-function AlertList({ alerts }) {
-  if (!alerts?.length) return <span className="text-xs text-text-secondary">-</span>
+function JsvProgressBar({ jsvCount }) {
+  const threshold = 6
+  const progress = Math.min(jsvCount / threshold, 1)
+  const widthPct = Math.max(progress * 100, jsvCount === 0 ? 4 : 0)
+  const toneClass = jsvCount >= threshold ? 'bg-success' : 'bg-error'
 
   return (
-    <div className="flex flex-col gap-1">
-      {alerts.map((alert, index) => (
-        <span key={index} className="text-[10px] leading-tight text-text-secondary">
-          • {alert.message}
-        </span>
-      ))}
+    <div className="space-y-1">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
+        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${widthPct}%` }} />
+      </div>
+      <div className="text-[11px] text-text-secondary">{`${jsvCount} / ${threshold}`}</div>
     </div>
   )
 }
@@ -124,6 +126,32 @@ function AlertList({ alerts }) {
 function DataWarning({ tone = 'warning', message }) {
   if (!message) return null
   return <Alert tone={tone}>{message}</Alert>
+}
+
+function CollapsibleInsightsTable({ title, trailing, children, defaultOpen = true }) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group rounded-2xl border border-border bg-surface/60 p-0"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">{title}</h3>
+        <div className="flex items-center gap-2">
+          {trailing}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180"
+            fill="none"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M6 10l6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      </summary>
+      <div className="px-4 pb-4">{children}</div>
+    </details>
+  )
 }
 
 function UnifiedAdminSection() {
@@ -485,37 +513,40 @@ function UnifiedAdminSection() {
         id: 'compliance-by-salesperson',
         render: () => (
           <GlassCard className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance by Salesperson</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Subteam Member JSV Compliance</h2>
             <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
               <table className="table-core min-w-full text-sm">
                 <thead>
                   <tr>
-                    <th>Salesperson</th>
+                    <th>Member</th>
+                    <th>Role</th>
+                    <th>Main Team</th>
                     <th>Team</th>
-                    <th>Total Calls</th>
-                    <th>NC</th>
-                    <th>JSV</th>
-                    <th>FC</th>
-                    <th>SC</th>
+                    <th>Sub Team</th>
+                    <th>Weekly JSV</th>
+                    <th>JSV Bar</th>
                     <th>Status</th>
-                    <th>Alerts</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(activityData?.salespersonCards || []).map((card) => (
-                    <tr key={card.salesman.id}>
-                      <td>{card.salesman.name}</td>
-                      <td>{card.salesman.team}</td>
-                      <td>{card.stats.totalCalls}</td>
-                      <td>{card.stats.ncCount}</td>
+                  {(activityData?.subteamMemberCards || [])
+                    .filter((card) => {
+                      const subTeam = String(card?.member?.subTeam || '').trim()
+                      return Boolean(subTeam) && subTeam.toLowerCase() !== 'unassigned'
+                    })
+                    .map((card) => (
+                    <tr key={card.member.id}>
+                      <td>{card.member.name || card.member.email}</td>
+                      <td>{String(card.member.role || '-').toUpperCase()}</td>
+                      <td>{card.member.mainTeam || '-'}</td>
+                      <td>{card.member.team || '-'}</td>
+                      <td>{card.member.subTeam || '-'}</td>
                       <td>{card.stats.jsvCount}</td>
-                      <td>{card.stats.fcCount}</td>
-                      <td>{card.stats.scCount}</td>
                       <td>
-                        <StatusChip severity={card.alerts.length > 0 ? card.alerts[0].severity : 'compliant'} />
+                        <JsvProgressBar jsvCount={card.stats.jsvCount || 0} />
                       </td>
                       <td>
-                        <AlertList alerts={card.alerts} />
+                        <StatusChip severity={card.stats.isCompliant ? 'compliant' : 'critical'} />
                       </td>
                     </tr>
                   ))}
@@ -551,8 +582,7 @@ function UnifiedAdminSection() {
           <GlassCard className="space-y-4">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">More Insights</h2>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h3>
+            <CollapsibleInsightsTable title="Salesperson Performance Rollup">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
@@ -583,10 +613,9 @@ function UnifiedAdminSection() {
                   </tbody>
                 </table>
               </DataTableFrame>
-            </section>
+            </CollapsibleInsightsTable>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h3>
+            <CollapsibleInsightsTable title="Recent Activity / Drilldown">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
@@ -629,10 +658,9 @@ function UnifiedAdminSection() {
                   </tbody>
                 </table>
               </DataTableFrame>
-            </section>
+            </CollapsibleInsightsTable>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Non-Visit Rates</h3>
+            <CollapsibleInsightsTable title="Salesperson Non-Visit Rates">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
@@ -655,13 +683,12 @@ function UnifiedAdminSection() {
                   </tbody>
                 </table>
               </DataTableFrame>
-            </section>
+            </CollapsibleInsightsTable>
 
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Repeated Non-Visits (Last 8 Weeks)</h3>
-                <Badge tone="warning">Threshold: &ge; 2 weeks</Badge>
-              </div>
+            <CollapsibleInsightsTable
+              title="Repeated Non-Visits (Last 8 Weeks)"
+              trailing={<Badge tone="warning">Threshold: &ge; 2 weeks</Badge>}
+            >
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
@@ -686,10 +713,9 @@ function UnifiedAdminSection() {
                   </tbody>
                 </table>
               </DataTableFrame>
-            </section>
+            </CollapsibleInsightsTable>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Detailed Drilldown (Top 100)</h3>
+            <CollapsibleInsightsTable title="Detailed Drilldown (Top 100)">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
@@ -724,7 +750,7 @@ function UnifiedAdminSection() {
                   </tbody>
                 </table>
               </DataTableFrame>
-            </section>
+            </CollapsibleInsightsTable>
           </GlassCard>
         ),
       },

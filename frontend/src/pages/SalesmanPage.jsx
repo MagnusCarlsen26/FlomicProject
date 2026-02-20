@@ -67,11 +67,11 @@ function SectionCard({ title, description, actions, children }) {
   )
 }
 
-const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled, jsvAdminUsers }) {
-  const normalizedAdmins = Array.isArray(jsvAdminUsers) ? jsvAdminUsers : []
-  const adminIds = new Set(normalizedAdmins.map((admin) => admin.id))
+const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled, jsvEligibleUsers }) {
+  const normalizedMembers = Array.isArray(jsvEligibleUsers) ? jsvEligibleUsers : []
+  const memberIds = new Set(normalizedMembers.map((member) => member.id))
   const selectedJsvValue = row.jsvWithWhom || ''
-  const hasLegacyValue = selectedJsvValue && !adminIds.has(selectedJsvValue)
+  const hasLegacyValue = selectedJsvValue && !memberIds.has(selectedJsvValue)
 
   return (
     <tr>
@@ -125,13 +125,13 @@ const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled,
           onChange={(event) => updateRow(index, 'jsvWithWhom', event.target.value)}
           disabled={disabled || row.contactType !== 'jsv'}
         >
-          <option value="">Select admin</option>
+          <option value="">Select member</option>
           {hasLegacyValue ? (
             <option value={selectedJsvValue}>{`Legacy (unchanged): ${selectedJsvValue}`}</option>
           ) : null}
-          {normalizedAdmins.map((admin) => (
-            <option key={admin.id} value={admin.id}>
-              {admin.name || admin.email}
+          {normalizedMembers.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.name || member.email}
             </option>
           ))}
         </Select>
@@ -140,7 +140,7 @@ const PlanningRow = memo(function PlanningRow({ row, index, updateRow, disabled,
   )
 })
 
-function PlanningTableEditor({ rows, setRows, disabled, jsvAdminUsers }) {
+function PlanningTableEditor({ rows, setRows, disabled, jsvEligibleUsers }) {
   const updateRow = useCallback(
     (index, field, value) => {
       setRows((prevRows) =>
@@ -187,7 +187,7 @@ function PlanningTableEditor({ rows, setRows, disabled, jsvAdminUsers }) {
               index={index}
               updateRow={updateRow}
               disabled={disabled}
-              jsvAdminUsers={jsvAdminUsers}
+              jsvEligibleUsers={jsvEligibleUsers}
             />
           ))}
         </tbody>
@@ -390,7 +390,7 @@ export default function SalesmanPage() {
   const [actualRows, setActualRows] = useState([])
   const [planningSubmittedAt, setPlanningSubmittedAt] = useState(null)
   const [actualUpdatedAt, setActualUpdatedAt] = useState(null)
-  const [jsvAdminUsers, setJsvAdminUsers] = useState([])
+  const [jsvEligibleUsers, setJsvEligibleUsers] = useState([])
 
   const [savingActual, setSavingActual] = useState(false)
   const [savingPlanning, setSavingPlanning] = useState(false)
@@ -406,7 +406,7 @@ export default function SalesmanPage() {
       setActualRows(data?.actualOutput?.rows || [])
       setPlanningSubmittedAt(data?.planning?.submittedAt || null)
       setActualUpdatedAt(data?.actualOutput?.updatedAt || null)
-      setJsvAdminUsers(data?.jsvAdminUsers || [])
+      setJsvEligibleUsers(data?.jsvEligibleUsers || data?.jsvAdminUsers || [])
       setSuccessMessage(null)
     } catch (e) {
       setSuccessMessage(null)
@@ -495,7 +495,7 @@ export default function SalesmanPage() {
               rows={planningRows}
               setRows={setPlanningRows}
               disabled={!isEditable || savingPlanning}
-              jsvAdminUsers={jsvAdminUsers}
+              jsvEligibleUsers={jsvEligibleUsers}
             />
           )}
         </SectionCard>

@@ -84,6 +84,7 @@ function parseNonNegativeInteger(rawValue, label) {
 
 function normalizePlanningRows(rows, week, options = {}) {
   const {
+    allowedJsvUserIds = null,
     allowedAdminIds = null,
     existingRowsByDate = null,
     allowLegacyUnchanged = false,
@@ -138,10 +139,12 @@ function normalizePlanningRows(rows, week, options = {}) {
     if (contactType !== 'jsv') {
       normalizedRow.jsvWithWhom = '';
     } else if (normalizedRow.jsvWithWhom) {
-      const isAllowedAdminId =
-        allowedAdminIds instanceof Set && allowedAdminIds.has(normalizedRow.jsvWithWhom);
+      const legacyAllowedAdminIds =
+        allowedJsvUserIds instanceof Set ? null : allowedAdminIds;
+      const allowedIds = allowedJsvUserIds instanceof Set ? allowedJsvUserIds : legacyAllowedAdminIds;
+      const isAllowedUserId = allowedIds instanceof Set && allowedIds.has(normalizedRow.jsvWithWhom);
 
-      if (!isAllowedAdminId) {
+      if (!isAllowedUserId) {
         const existingRow =
           existingRowsByDate instanceof Map ? existingRowsByDate.get(date) : null;
         const existingValue = String(existingRow?.jsvWithWhom || '').trim();
@@ -152,7 +155,7 @@ function normalizePlanningRows(rows, week, options = {}) {
 
         if (!isUnchangedLegacy) {
           return {
-            error: `planning.rows[${index}].jsvWithWhom must reference an admin user`,
+            error: `planning.rows[${index}].jsvWithWhom must reference an eligible user`,
           };
         }
       }

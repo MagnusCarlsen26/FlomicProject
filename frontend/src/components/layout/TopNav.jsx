@@ -27,9 +27,10 @@ export default function TopNav() {
   const location = useLocation()
   const hideSalesmanNav = location.pathname === '/salesman'
   const hideInsightsUserInfo = location.pathname === '/admin/insights'
+  const hideJsvAlertOnPage = location.pathname === '/admin/salesmen-status'
   const navItems = getNavItems(user)
   const alertMessage = user?.jsvRepeatAlert?.message || ''
-  const hasJsvAlert = user?.jsvRepeatAlert?.active === true
+  const hasJsvAlert = user?.jsvRepeatAlert?.active === true && !hideJsvAlertOnPage
 
   if (hideSalesmanNav) {
     return (

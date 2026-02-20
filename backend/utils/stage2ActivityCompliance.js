@@ -1,4 +1,4 @@
-const { IST_TIME_ZONE, formatDateKey, resolveWeekFromQuery, getWeekParts } = require('./week');
+const { resolveWeekFromQuery } = require('./week');
 
 const TARGETS = {
   totalCalls: 20,
@@ -6,9 +6,7 @@ const TARGETS = {
   jsvCount: 5,
 };
 
-function safeDivide(numerator, denominator) {
-  return denominator ? numerator / denominator : 0;
-}
+const JSV_THRESHOLD = 6; // strict > 5/week
 
 function resolveStage2Range(query) {
   const week = resolveWeekFromQuery(query.week);
@@ -31,44 +29,48 @@ function hasMeaningfulPlanningRow(row) {
   ].some(Boolean);
 }
 
+function buildMemberCard(user) {
+  const userId = String(user._id);
+  return {
+    member: {
+      id: userId,
+      name: user.name || user.email,
+      email: user.email || '',
+      role: user.role || 'salesman',
+      mainTeam: user.mainTeam || 'Unassigned',
+      team: user.team || 'Unassigned',
+      subTeam: user.subTeam || 'Unassigned',
+    },
+    stats: {
+      jsvCount: 0,
+      threshold: JSV_THRESHOLD,
+      shortfall: JSV_THRESHOLD,
+      isCompliant: false,
+    },
+    contributors: new Map(),
+    alerts: [],
+  };
+}
+
 function buildStage2Payload({ users, reports, range, filters }) {
-  const currentWeek = getWeekParts();
-  const isPastWeek = range.weekStartDateUtc < currentWeek.weekStartDateUtc;
-  const isCurrentWeek = range.key === currentWeek.key;
+  const usersById = new Map(users.map((u) => [String(u._id), u]));
+  const reportsBySalespersonId = new Map(reports.map((report) => [String(report.salesmanId), report]));
 
-  // Calculate elapsed days for pro-rating warnings
-  let elapsedDays = 7;
-  if (isCurrentWeek) {
-    const now = new Date();
-    // Simple calculation: difference in days from week start in IST
-    const start = range.weekStartDateUtc;
-    const diff = Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1;
-    elapsedDays = Math.max(1, Math.min(7, diff));
-  }
-
-  const getExpectedPace = (target) => Math.ceil((target * elapsedDays) / 7);
-
-  const usersById = new Map(users.map(u => [String(u._id), u]));
-  const adminUsers = users.filter(u => u.role === 'admin');
-  const adminIds = new Set(adminUsers.map(u => String(u._id)));
+  const subteamMemberCardsMap = new Map();
+  users
+    .filter((user) => String(user.role || '').toLowerCase() === 'admin')
+    .forEach((user) => {
+    const userId = String(user._id);
+    subteamMemberCardsMap.set(userId, buildMemberCard(user));
+    });
 
   const salesmanCards = [];
-  const adminCards = new Map(adminUsers.map(admin => [String(admin._id), {
-    admin: { id: String(admin._id), name: admin.name || admin.email },
-    jsvCount: 0,
-    salespersonBreakdown: new Map(),
-    alerts: [],
-  }]));
-
   const drilldown = [];
-  let compliantCount = 0;
-  let nonCompliantCount = 0;
-  const alertBreakdown = { type: {}, severity: { critical: 0, warning: 0 } };
 
   for (const user of users) {
     const userId = String(user._id);
-    const report = reports.find(r => String(r.salesmanId) === userId);
-    
+    const report = reportsBySalespersonId.get(userId);
+
     const stats = {
       totalCalls: 0,
       ncCount: 0,
@@ -79,155 +81,125 @@ function buildStage2Payload({ users, reports, range, filters }) {
 
     const actualMap = new Map();
     if (report) {
-      report.actualOutputRows.forEach(row => {
+      (report.actualOutputRows || []).forEach((row) => {
         if (row.visited === 'yes') {
           actualMap.set(row.date, true);
         }
       });
 
-      report.planningRows.forEach(planRow => {
+      (report.planningRows || []).forEach((planRow) => {
         if (!hasMeaningfulPlanningRow(planRow)) return;
-        if (actualMap.get(planRow.date)) {
-          stats.totalCalls++;
-          const type = String(planRow.contactType).toLowerCase();
-          if (type === 'nc') stats.ncCount++;
-          if (type === 'jsv') {
-            stats.jsvCount++;
-            const adminId = planRow.jsvWithWhom;
-            if (adminId && adminIds.has(adminId) && adminCards.has(adminId)) {
-              const adminCard = adminCards.get(adminId);
-              adminCard.jsvCount++;
-              const currentBreakdown = adminCard.salespersonBreakdown.get(userId) || {
-                salespersonId: userId,
-                name: user.name || user.email,
-                jsvCountWithAdmin: 0,
-              };
-              currentBreakdown.jsvCountWithAdmin++;
-              adminCard.salespersonBreakdown.set(userId, currentBreakdown);
-            }
+        if (!actualMap.get(planRow.date)) return;
+
+        stats.totalCalls++;
+        const type = String(planRow.contactType || '').trim().toLowerCase();
+
+        if (type === 'nc') stats.ncCount++;
+        if (type === 'fc') stats.fcCount++;
+        if (type === 'sc') stats.scCount++;
+
+        if (type === 'jsv') {
+          stats.jsvCount++;
+
+          const memberId = String(planRow.jsvWithWhom || '').trim();
+          if (memberId && subteamMemberCardsMap.has(memberId)) {
+            const memberCard = subteamMemberCardsMap.get(memberId);
+            memberCard.stats.jsvCount++;
+
+            const contributor = memberCard.contributors.get(userId) || {
+              salespersonId: userId,
+              name: user.name || user.email,
+              jsvCountWithMember: 0,
+            };
+            contributor.jsvCountWithMember++;
+            memberCard.contributors.set(userId, contributor);
           }
-          if (type === 'fc') stats.fcCount++;
-          if (type === 'sc') stats.scCount++;
-
-          drilldown.push({
-            salesperson: { id: userId, name: user.name || user.email },
-            date: planRow.date,
-            type,
-            customerName: planRow.customerName,
-          });
         }
-      });
-    }
 
-    const alerts = [];
-    const evaluateRule = (key, current, target, label) => {
-      const expected = getExpectedPace(target);
-      let severity = null;
-      let message = '';
-
-      if (isPastWeek && current < target) {
-        severity = 'critical';
-        message = `${label} target missed (${current}/${target})`;
-      } else if (isCurrentWeek) {
-        if (current < expected) {
-          severity = 'warning';
-          message = `${label} below pace (${current}/${expected})`;
-        }
-      }
-
-      if (severity) {
-        alerts.push({
-          ruleKey: key,
-          severity,
-          status: 'open',
-          current,
-          target: isPastWeek ? target : expected,
-          shortfall: (isPastWeek ? target : expected) - current,
-          message,
-          recommendation: `Increase ${label} activity to meet ${isPastWeek ? 'weekly' : 'daily'} target.`,
+        const memberId = String(planRow.jsvWithWhom || '').trim();
+        const member = memberId && usersById.has(memberId) ? usersById.get(memberId) : null;
+        drilldown.push({
+          salesperson: {
+            id: userId,
+            name: user.name || user.email,
+            team: user.team || 'Unassigned',
+          },
+          member: member
+            ? {
+                id: String(member._id),
+                name: member.name || member.email,
+                team: member.team || 'Unassigned',
+                subTeam: member.subTeam || 'Unassigned',
+              }
+            : null,
+          date: planRow.date,
+          type,
+          customerName: planRow.customerName,
         });
-        alertBreakdown.severity[severity]++;
-        alertBreakdown.type[key] = (alertBreakdown.type[key] || 0) + 1;
-      }
-    };
-
-    evaluateRule('totalCalls', stats.totalCalls, TARGETS.totalCalls, 'Total Calls');
-    evaluateRule('ncCount', stats.ncCount, TARGETS.ncCount, 'New Calls');
-    evaluateRule('jsvCount', stats.jsvCount, TARGETS.jsvCount, 'Joint Sales Visits');
-
-    // Service-heavy rule
-    const isServiceHeavy = safeDivide(stats.scCount, stats.totalCalls) > 0.5;
-    if (isServiceHeavy && stats.ncCount < getExpectedPace(TARGETS.ncCount)) {
-      const severity = isPastWeek ? 'critical' : 'warning';
-      alerts.push({
-        ruleKey: 'serviceHeavy',
-        severity,
-        status: 'open',
-        current: stats.scCount,
-        message: 'High Service Call ratio with low New Call pace',
-        recommendation: 'Balance service calls with more new business acquisition.',
       });
-      alertBreakdown.severity[severity]++;
-      alertBreakdown.type['serviceHeavy'] = (alertBreakdown.type['serviceHeavy'] || 0) + 1;
     }
-
-    if (alerts.length > 0) nonCompliantCount++;
-    else compliantCount++;
 
     salesmanCards.push({
       salesman: {
         id: userId,
         name: user.name || user.email,
-        team: user.team,
-        mainTeam: user.mainTeam,
+        team: user.team || 'Unassigned',
+        mainTeam: user.mainTeam || 'Unassigned',
       },
       stats,
-      alerts,
-      isCompliant: alerts.length === 0,
+      alerts: [],
+      isCompliant: true,
     });
   }
 
-  const finalAdminCards = Array.from(adminCards.values()).map(card => {
-    const breakdownArray = Array.from(card.salespersonBreakdown.values());
-    const totalJsv = card.jsvCount;
-    breakdownArray.forEach(b => {
-      b.sharePct = totalJsv > 0 ? (b.jsvCountWithAdmin / totalJsv) : 0;
+  const alertBreakdown = { type: {}, severity: { critical: 0, warning: 0 } };
+  let compliantCount = 0;
+  let nonCompliantCount = 0;
+
+  const subteamMemberCards = Array.from(subteamMemberCardsMap.values())
+    .map((card) => {
+      const jsvCount = card.stats.jsvCount;
+      const isCompliant = jsvCount >= JSV_THRESHOLD;
+      const shortfall = Math.max(0, JSV_THRESHOLD - jsvCount);
+      const alerts = [];
+
+      if (!isCompliant) {
+        alerts.push({
+          ruleKey: 'subteamMemberJsv',
+          severity: 'critical',
+          status: 'open',
+          current: jsvCount,
+          target: JSV_THRESHOLD,
+          shortfall,
+          message: `Weekly JSV target missed (${jsvCount}/${JSV_THRESHOLD} required)`,
+          recommendation: 'Increase joint sales visits this week.',
+        });
+        alertBreakdown.severity.critical++;
+        alertBreakdown.type.subteamMemberJsv = (alertBreakdown.type.subteamMemberJsv || 0) + 1;
+        nonCompliantCount++;
+      } else {
+        compliantCount++;
+      }
+
+      return {
+        member: card.member,
+        stats: {
+          jsvCount,
+          threshold: JSV_THRESHOLD,
+          shortfall,
+          isCompliant,
+        },
+        contributors: Array.from(card.contributors.values()).sort(
+          (a, b) => b.jsvCountWithMember - a.jsvCountWithMember,
+        ),
+        alerts,
+      };
+    })
+    .sort((a, b) => {
+      const byJsv = b.stats.jsvCount - a.stats.jsvCount;
+      if (byJsv !== 0) return byJsv;
+      return (a.member.name || '').localeCompare(b.member.name || '');
     });
-
-    const topContributor = breakdownArray.sort((a, b) => b.sharePct - a.sharePct)[0];
-    const unevenParticipation = topContributor && topContributor.sharePct > 0.6 && totalJsv >= 5;
-    
-    const alerts = [];
-    const expectedJsv = getExpectedPace(5);
-    if (isPastWeek && totalJsv < 5) {
-      alerts.push({
-        ruleKey: 'adminJsv',
-        severity: 'critical',
-        message: `Weekly JSV target missed (${totalJsv}/5)`,
-      });
-    } else if (isCurrentWeek && totalJsv < expectedJsv) {
-      alerts.push({
-        ruleKey: 'adminJsv',
-        severity: 'warning',
-        message: `JSV below pace (${totalJsv}/${expectedJsv})`,
-      });
-    }
-
-    if (unevenParticipation) {
-      alerts.push({
-        ruleKey: 'unevenParticipation',
-        severity: 'warning',
-        message: `Uneven participation detected: ${topContributor.name} has ${Math.round(topContributor.sharePct * 100)}% share.`,
-      });
-    }
-
-    return {
-      ...card,
-      salespersonBreakdown: breakdownArray,
-      unevenParticipation,
-      alerts,
-    };
-  });
 
   return {
     week: {
@@ -244,8 +216,10 @@ function buildStage2Payload({ users, reports, range, filters }) {
       alertBreakdown,
     },
     salesmanCards,
-    adminCards: finalAdminCards,
+    subteamMemberCards,
     drilldown,
+    filters: filters || {},
+    targets: TARGETS,
   };
 }
 

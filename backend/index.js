@@ -147,16 +147,32 @@ function normalizeCollapsedSectionIds(sectionIds = []) {
   return normalized;
 }
 
-async function listAdminUsers() {
-  const admins = await User.find({ role: 'admin' })
-    .select('_id name email')
+async function listJsvEligibleUsersForSalesperson(userId) {
+  const currentUser = await User.findById(userId).select('_id subTeam').lean();
+  if (!currentUser) {
+    return [];
+  }
+
+  const subTeam = String(currentUser.subTeam || '').trim();
+  if (!subTeam) {
+    return [];
+  }
+
+  const users = await User.find({
+    role: { $in: ['salesman', 'admin'] },
+    subTeam,
+    _id: { $ne: currentUser._id },
+  })
+    .select('_id name email role subTeam')
     .sort({ name: 1, email: 1 })
     .lean();
 
-  return admins.map((admin) => ({
-    id: String(admin._id),
-    name: admin.name || '',
-    email: admin.email,
+  return users.map((user) => ({
+    id: String(user._id),
+    name: user.name || '',
+    email: user.email || '',
+    role: user.role || 'salesman',
+    subTeam: user.subTeam || 'Unassigned',
   }));
 }
 
@@ -212,7 +228,7 @@ async function getOrCreateCurrentWeekReport(salesmanId) {
   return { report, week };
 }
 
-function buildSalesmanWeekResponse(report, week, jsvAdminUsers = []) {
+function buildSalesmanWeekResponse(report, week, jsvEligibleUsers = []) {
   return {
     week: {
       key: week.key,
@@ -234,7 +250,9 @@ function buildSalesmanWeekResponse(report, week, jsvAdminUsers = []) {
       note: report.statusNote || '',
       updatedAt: report.statusUpdatedAt || null,
     },
-    jsvAdminUsers,
+    jsvEligibleUsers,
+    // Backward-compatible alias for one release cycle.
+    jsvAdminUsers: jsvEligibleUsers,
   };
 }
 
@@ -412,8 +430,8 @@ app.get('/api/salesman/current-week', requireAuth, requireRole('salesman', 'admi
 
   try {
     const { report, week } = await getOrCreateCurrentWeekReport(req.auth.userId);
-    const jsvAdminUsers = await listAdminUsers();
-    return res.status(200).json(buildSalesmanWeekResponse(report, week, jsvAdminUsers));
+    const jsvEligibleUsers = await listJsvEligibleUsersForSalesperson(req.auth.userId);
+    return res.status(200).json(buildSalesmanWeekResponse(report, week, jsvEligibleUsers));
   } catch (error) {
     console.error('Current week fetch error:', error);
     return res.status(500).json({ message: 'Unable to fetch current week data' });
@@ -436,9 +454,9 @@ app.put('/api/salesman/planning', requireAuth, requireRole('salesman', 'admin'),
 
   try {
     const { report } = await getOrCreateCurrentWeekReport(req.auth.userId);
-    const jsvAdminUsers = await listAdminUsers();
+    const jsvEligibleUsers = await listJsvEligibleUsersForSalesperson(req.auth.userId);
     const normalizedResult = normalizePlanningRows(rows, currentWeek, {
-      allowedAdminIds: new Set(jsvAdminUsers.map((admin) => admin.id)),
+      allowedJsvUserIds: new Set(jsvEligibleUsers.map((member) => member.id)),
       existingRowsByDate: toExistingRowsByDate(report.planningRows || []),
       allowLegacyUnchanged: true,
     });
@@ -655,9 +673,11 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
 
   try {
     const threshold = 3;
-    const adminUsers = await listAdminUsers();
-    const adminLabelById = new Map(
-      adminUsers.map((admin) => [admin.id, admin.name || admin.email])
+    const jsvUsers = await User.find({ role: { $in: ['salesman', 'admin'] } })
+      .select('_id name email')
+      .lean();
+    const jsvLabelById = new Map(
+      jsvUsers.map((member) => [String(member._id), member.name || member.email])
     );
 
     const salesmen = await User.find(salesmanQuery)
@@ -717,7 +737,7 @@ app.get('/api/admin/salesmen-status', requireAuth, requireRole('admin'), async (
             jsvRepeatAlert,
           },
           planning: {
-            rows: mapPlanningRowsForDisplay(report?.planningRows || [], adminLabelById),
+            rows: mapPlanningRowsForDisplay(report?.planningRows || [], jsvLabelById),
             submittedAt: report?.planningSubmittedAt || null,
           },
           actualOutput: {

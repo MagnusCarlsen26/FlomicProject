@@ -29,18 +29,32 @@ test('normalizePlanningRows rejects invalid contact type', () => {
   assert.match(result.error, /contactType/i);
 });
 
-test('normalizePlanningRows accepts admin id for jsvWithWhom', () => {
+test('normalizePlanningRows accepts eligible user id for jsvWithWhom', () => {
   const week = getWeekParts(new Date('2026-02-11T00:00:00.000Z'));
   const rows = buildDefaultPlanningRows(week).map((row) => ({ ...row }));
   rows[0].contactType = 'jsv';
-  rows[0].jsvWithWhom = 'admin-1';
+  rows[0].jsvWithWhom = 'user-1';
 
   const result = normalizePlanningRows(rows, week, {
-    allowedAdminIds: new Set(['admin-1', 'admin-2']),
+    allowedJsvUserIds: new Set(['user-1', 'user-2']),
   });
 
   assert.equal(result.error, undefined);
-  assert.equal(result.rows[0].jsvWithWhom, 'admin-1');
+  assert.equal(result.rows[0].jsvWithWhom, 'user-1');
+});
+
+test('normalizePlanningRows still accepts legacy allowedAdminIds option', () => {
+  const week = getWeekParts(new Date('2026-02-11T00:00:00.000Z'));
+  const rows = buildDefaultPlanningRows(week).map((row) => ({ ...row }));
+  rows[0].contactType = 'jsv';
+  rows[0].jsvWithWhom = 'legacy-admin-id';
+
+  const result = normalizePlanningRows(rows, week, {
+    allowedAdminIds: new Set(['legacy-admin-id']),
+  });
+
+  assert.equal(result.error, undefined);
+  assert.equal(result.rows[0].jsvWithWhom, 'legacy-admin-id');
 });
 
 test('normalizeActualOutputRows requires notVisitedReasonCategory when visited is no', () => {
@@ -85,18 +99,18 @@ test('normalizeActualOutputRows allows unchanged legacy row without category', (
   assert.match(result2.error, /notVisitedReasonCategory is required/i);
 });
 
-test('normalizePlanningRows rejects non-admin jsvWithWhom for new value', () => {
+test('normalizePlanningRows rejects non-eligible jsvWithWhom for new value', () => {
   const week = getWeekParts(new Date('2026-02-11T00:00:00.000Z'));
   const rows = buildDefaultPlanningRows(week).map((row) => ({ ...row }));
   rows[0].contactType = 'jsv';
   rows[0].jsvWithWhom = 'Area Manager';
 
   const result = normalizePlanningRows(rows, week, {
-    allowedAdminIds: new Set(['admin-1']),
+    allowedJsvUserIds: new Set(['user-1']),
   });
 
   assert.ok(result.error);
-  assert.match(result.error, /jsvWithWhom must reference an admin user/i);
+  assert.match(result.error, /jsvWithWhom must reference an eligible user/i);
 });
 
 test('normalizePlanningRows allows unchanged legacy jsvWithWhom', () => {
@@ -107,7 +121,7 @@ test('normalizePlanningRows allows unchanged legacy jsvWithWhom', () => {
   rows[0].jsvWithWhom = 'Legacy Lead';
 
   const result = normalizePlanningRows(rows, week, {
-    allowedAdminIds: new Set(['admin-1']),
+    allowedJsvUserIds: new Set(['user-1']),
     existingRowsByDate: new Map([[date, { date, jsvWithWhom: 'Legacy Lead' }]]),
     allowLegacyUnchanged: true,
   });
@@ -124,23 +138,23 @@ test('normalizePlanningRows rejects changed legacy jsvWithWhom', () => {
   rows[0].jsvWithWhom = 'Another Legacy';
 
   const result = normalizePlanningRows(rows, week, {
-    allowedAdminIds: new Set(['admin-1']),
+    allowedJsvUserIds: new Set(['user-1']),
     existingRowsByDate: new Map([[date, { date, jsvWithWhom: 'Legacy Lead' }]]),
     allowLegacyUnchanged: true,
   });
 
   assert.ok(result.error);
-  assert.match(result.error, /jsvWithWhom must reference an admin user/i);
+  assert.match(result.error, /jsvWithWhom must reference an eligible user/i);
 });
 
 test('normalizePlanningRows clears jsvWithWhom when contactType is not jsv', () => {
   const week = getWeekParts(new Date('2026-02-11T00:00:00.000Z'));
   const rows = buildDefaultPlanningRows(week).map((row) => ({ ...row }));
   rows[0].contactType = 'fc';
-  rows[0].jsvWithWhom = 'admin-1';
+  rows[0].jsvWithWhom = 'user-1';
 
   const result = normalizePlanningRows(rows, week, {
-    allowedAdminIds: new Set(['admin-1']),
+    allowedJsvUserIds: new Set(['user-1']),
   });
 
   assert.equal(result.error, undefined);
