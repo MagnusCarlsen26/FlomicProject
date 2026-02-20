@@ -1,20 +1,39 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import DraggableSection from '../components/admin/DraggableSection'
 import InsightCard from '../components/admin/InsightCard'
-import Stage3PlannedNotVisitedSection from '../components/admin/Stage3PlannedNotVisitedSection'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
+import { notVisitedReasonCategoryLabel } from '../constants/weeklyReportFields'
+import { useAuth } from '../context/useAuth'
 import Alert from '../components/ui/Alert'
+import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import MultiSelect from '../components/ui/MultiSelect'
 import Select from '../components/ui/Select'
-import { getAdminStage1PlanActual, getAdminStage2ActivityCompliance } from '../services/api'
+import { getAdminStage1PlanActual, getAdminStage2ActivityCompliance, getAdminStage3PlannedNotVisited } from '../services/api'
+import {
+  DEFAULT_FULL_ROW_SECTION_IDS,
+  DEFAULT_LAYOUT,
+  getFullRowStorageKey,
+  getLayoutStorageKey,
+  loadFullRowSections,
+  loadLayout,
+  migrateAnonymousLayoutToUser,
+  normalizeLayout,
+  saveFullRowSections,
+  saveLayout,
+} from '../utils/adminInsightsLayout'
 import { formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
 
 const ADMIN_TABLE_FRAME_CLASS = 'max-h-[34rem] overflow-y-auto'
+const INSIGHTS_SECTION_IDS = DEFAULT_LAYOUT
+const STAGE3_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8']
 
 function formatCallType(callType) {
   if (!callType) return 'Unknown'
@@ -87,12 +106,13 @@ function DataWarning({ tone = 'warning', message }) {
 }
 
 function UnifiedAdminSection() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
-  const [combinedData, setCombinedData] = useState({ planActual: null, activityCompliance: null })
-  const [dataErrors, setDataErrors] = useState({ planActual: null, activityCompliance: null })
+  const [combinedData, setCombinedData] = useState({ planActual: null, activityCompliance: null, stage3: null })
+  const [dataErrors, setDataErrors] = useState({ planActual: null, activityCompliance: null, stage3: null })
   const [lastPolledAt, setLastPolledAt] = useState(null)
 
   const [query, setQuery] = useState('')
@@ -110,6 +130,7 @@ function UnifiedAdminSection() {
 
   const [appliedFilters, setAppliedFilters] = useState({})
   const fetchCounterRef = useRef(0)
+  const migratedLayoutUsersRef = useRef(new Set())
 
   const fetchData = useCallback(
     async ({ silent = false, showSuccess = false, filters = appliedFilters } = {}) => {
@@ -142,15 +163,16 @@ function UnifiedAdminSection() {
       }
 
       try {
-        const [planActualResult, activityResult] = await Promise.allSettled([
+        const [planActualResult, activityResult, stage3Result] = await Promise.allSettled([
           getAdminStage1PlanActual(stage1Filters),
           getAdminStage2ActivityCompliance(stage2Filters),
+          getAdminStage3PlannedNotVisited(stage2Filters),
         ])
 
         if (fetchId !== fetchCounterRef.current) return
 
-        const nextErrors = { planActual: null, activityCompliance: null }
-        const nextData = { planActual: null, activityCompliance: null }
+        const nextErrors = { planActual: null, activityCompliance: null, stage3: null }
+        const nextData = { planActual: null, activityCompliance: null, stage3: null }
 
         if (planActualResult.status === 'fulfilled') {
           nextData.planActual = planActualResult.value || null
@@ -164,11 +186,17 @@ function UnifiedAdminSection() {
           nextErrors.activityCompliance = getErrorMessage(activityResult.reason)
         }
 
+        if (stage3Result.status === 'fulfilled') {
+          nextData.stage3 = stage3Result.value || null
+        } else {
+          nextErrors.stage3 = getErrorMessage(stage3Result.reason)
+        }
+
         setCombinedData(nextData)
         setDataErrors(nextErrors)
         setLastPolledAt(new Date().toISOString())
 
-        if (nextErrors.planActual && nextErrors.activityCompliance) {
+        if (nextErrors.planActual && nextErrors.activityCompliance && nextErrors.stage3) {
           setError('Unable to load dashboard data right now.')
           setSuccessMessage(null)
         } else {
@@ -193,6 +221,7 @@ function UnifiedAdminSection() {
 
   const planActualData = combinedData.planActual
   const activityData = combinedData.activityCompliance
+  const stage3Data = combinedData.stage3
 
   const mergedFilterOptions = useMemo(() => {
     const source = planActualData?.filterOptions || activityData?.filterOptions || {}
@@ -303,10 +332,585 @@ function UnifiedAdminSection() {
     label: formatCustomerType(row.customerType),
   }))
 
-  const topOver = planActualData?.topPerformers?.overAchievers || []
-  const topUnder = planActualData?.topPerformers?.underAchievers || []
   const visitDrilldownRows = useMemo(() => (planActualData?.drilldownRows || []).slice(0, 25), [planActualData])
   const activityDrilldownRows = useMemo(() => (activityData?.drilldown || []).slice(0, 25), [activityData])
+  const stage3WeeklyTrend = useMemo(() => stage3Data?.weeklyTrend || [], [stage3Data])
+  const stage3ReasonDistribution = (stage3Data?.reasonDistribution || []).map((item) => ({
+    name: notVisitedReasonCategoryLabel(item.reasonCategory),
+    value: item.count,
+  }))
+  const stage3SalespersonRates = useMemo(() => stage3Data?.salespersonRates || [], [stage3Data])
+  const stage3TopRepeatedCustomers = useMemo(() => stage3Data?.topRepeatedCustomers || [], [stage3Data])
+  const stage3DrilldownRows = useMemo(() => stage3Data?.drilldownRows || [], [stage3Data])
+  const sectionDescriptors = useMemo(
+    () => [
+      {
+        id: 'visit-performance',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance</h2>
+              <DataWarning message={dataErrors.planActual} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <InsightCard title="Planned Visits" value={String(planActualData?.totals?.plannedVisits || 0)} />
+              <InsightCard title="Actual Visits" value={String(planActualData?.totals?.actualVisits || 0)} />
+              <InsightCard title="Variance" value={String(planActualData?.totals?.variance || 0)} />
+              <InsightCard title="Achievement" value={formatPercent(planActualData?.totals?.achievementRate || 0)} />
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'compliance-snapshot',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance Snapshot</h2>
+              <DataWarning message={dataErrors.activityCompliance} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <InsightCard title="Compliant" value={String(activityData?.summary?.compliantCount || 0)} />
+              <InsightCard title="Non-Compliant" value={String(activityData?.summary?.nonCompliantCount || 0)} />
+              <InsightCard title="Critical Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.critical || 0)} />
+              <InsightCard title="Warning Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.warning || 0)} />
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'daily-trend',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Daily Trend</h2>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={planActualData?.dailyTrend || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="plannedVisits" name="Planned" fill="#60a5fa" />
+                  <Bar dataKey="actualVisits" name="Actual" fill="#34d399" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'weekly-summary',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Summary</h2>
+            <MetricsTable rows={planActualData?.weeklySummary || []} labelKey="isoWeek" labelTitle="Week" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'monthly-rollup',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Monthly Rollup</h2>
+            <MetricsTable rows={planActualData?.monthlyRollup || []} labelKey="month" labelTitle="Month" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'call-type-split',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Call Type Split</h2>
+            <MetricsTable rows={callTypeRows} labelKey="label" labelTitle="Call Type" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'customer-type-split',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Customer Type Split</h2>
+            <MetricsTable rows={customerTypeRows} labelKey="label" labelTitle="Customer Type" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'top-over-achievers',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Over-Achievers</h2>
+            <MetricsTable rows={planActualData?.topPerformers?.overAchievers || []} labelKey="name" labelTitle="Salesperson" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'top-under-achievers',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Under-Achievers</h2>
+            <MetricsTable rows={planActualData?.topPerformers?.underAchievers || []} labelKey="name" labelTitle="Salesperson" />
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'salesperson-rollup',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Salesperson</th>
+                    <th>Main Team</th>
+                    <th>Team</th>
+                    <th>Sub Team</th>
+                    <th>Planned</th>
+                    <th>Actual</th>
+                    <th>Variance</th>
+                    <th>Achievement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(planActualData?.hierarchyRollups?.salesperson || []).map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.name || row.email}</td>
+                      <td>{row.mainTeam || '-'}</td>
+                      <td>{row.team || '-'}</td>
+                      <td>{row.subTeam || '-'}</td>
+                      <td>{row.plannedVisits}</td>
+                      <td>{row.actualVisits}</td>
+                      <td>{row.variance}</td>
+                      <td>{formatPercent(row.achievementRate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'compliance-by-salesperson',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance by Salesperson</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Salesperson</th>
+                    <th>Team</th>
+                    <th>Total Calls</th>
+                    <th>NC</th>
+                    <th>JSV</th>
+                    <th>FC</th>
+                    <th>SC</th>
+                    <th>Status</th>
+                    <th>Alerts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(activityData?.salespersonCards || []).map((card) => (
+                    <tr key={card.salesman.id}>
+                      <td>{card.salesman.name}</td>
+                      <td>{card.salesman.team}</td>
+                      <td>{card.stats.totalCalls}</td>
+                      <td>{card.stats.ncCount}</td>
+                      <td>{card.stats.jsvCount}</td>
+                      <td>{card.stats.fcCount}</td>
+                      <td>{card.stats.scCount}</td>
+                      <td>
+                        <StatusChip severity={card.alerts.length > 0 ? card.alerts[0].severity : 'compliant'} />
+                      </td>
+                      <td>
+                        <AlertList alerts={card.alerts} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'admin-monitoring',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Admin Monitoring</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Admin</th>
+                    <th>Total JSV</th>
+                    <th>Status</th>
+                    <th>Top Contributor</th>
+                    <th>Alerts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(activityData?.adminCards || []).map((card) => {
+                    const top = [...card.salespersonBreakdown].sort((a, b) => b.sharePct - a.sharePct)[0]
+                    return (
+                      <tr key={card.admin.id}>
+                        <td>{card.admin.name}</td>
+                        <td>{card.jsvCount}</td>
+                        <td>
+                          <StatusChip
+                            severity={
+                              card.alerts.find((a) => a.severity === 'critical')
+                                ? 'critical'
+                                : card.alerts.length > 0
+                                  ? 'warning'
+                                  : 'compliant'
+                            }
+                          />
+                        </td>
+                        <td>{top ? `${top.name} (${Math.round(top.sharePct * 100)}%)` : '-'}</td>
+                        <td>
+                          <AlertList alerts={card.alerts} />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'recent-activity',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Date</th>
+                    <th>Week</th>
+                    <th>Salesperson</th>
+                    <th>Team</th>
+                    <th>Customer</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitDrilldownRows.map((row, index) => (
+                    <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
+                      <td>Visits</td>
+                      <td>{row.date || '-'}</td>
+                      <td>{row.isoWeek || '-'}</td>
+                      <td>{row.salesman?.name || row.salesman?.email || '-'}</td>
+                      <td>{row.salesman?.team || '-'}</td>
+                      <td>{row.customerName || '-'}</td>
+                      <td>{formatCallType(row.callType)}</td>
+                      <td>{row.visited ? 'Visited' : 'Planned only'}</td>
+                    </tr>
+                  ))}
+                  {activityDrilldownRows.map((row, index) => (
+                    <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
+                      <td>Compliance</td>
+                      <td>{row.date || '-'}</td>
+                      <td>{week || '-'}</td>
+                      <td>{row.salesperson?.name || '-'}</td>
+                      <td>{row.salesperson?.team || '-'}</td>
+                      <td>{row.customerName || '-'}</td>
+                      <td>{String(row.type || '-').toUpperCase()}</td>
+                      <td>{row.type ? 'Logged' : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-summary',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Stage 3 Summary</h2>
+              <DataWarning message={dataErrors.stage3} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <InsightCard title="Stage 3 Planned Visits" value={String(stage3Data?.totals?.plannedVisits || 0)} />
+              <InsightCard title="Missed Visits" value={String(stage3Data?.totals?.plannedButNotVisitedCount || 0)} />
+              <InsightCard title="Non-Visit Rate" value={formatPercent(stage3Data?.totals?.nonVisitRate || 0)} />
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-weekly-trend',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Trend (Non-Visit Rate)</h2>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stage3WeeklyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="isoWeek" />
+                  <YAxis tickFormatter={formatPercent} />
+                  <Tooltip formatter={(val) => formatPercent(val)} />
+                  <Legend />
+                  <Bar dataKey="nonVisitRate" name="Non-Visit Rate" fill="#60a5fa" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-reason-distribution',
+        render: () => (
+          <GlassCard className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Reason Distribution</h2>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stage3ReasonDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  >
+                    {stage3ReasonDistribution.map((entry, index) => (
+                      <Cell key={`stage3-reason-${entry.name}-${index}`} fill={STAGE3_COLORS[index % STAGE3_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-salesperson-non-visit-rates',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Non-Visit Rates</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Salesperson</th>
+                    <th>Planned</th>
+                    <th>Missed</th>
+                    <th>Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stage3SalespersonRates.map((sr) => (
+                    <tr key={sr.id}>
+                      <td>{sr.name}</td>
+                      <td>{sr.plannedVisits}</td>
+                      <td>{sr.nonVisitedCount}</td>
+                      <td className="font-semibold text-primary">{formatPercent(sr.nonVisitRate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-repeated-non-visits',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Repeated Non-Visits (Last 8 Weeks)</h2>
+              <Badge tone="warning">Threshold: &ge; 2 weeks</Badge>
+            </div>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Salesperson</th>
+                    <th>Weeks</th>
+                    <th>Latest Date</th>
+                    <th>Dominant Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stage3TopRepeatedCustomers.map((hist, idx) => (
+                    <tr key={idx}>
+                      <td className="font-semibold">{hist.customerName}</td>
+                      <td>{hist.salesmanName}</td>
+                      <td>{hist.occurrences8w}</td>
+                      <td>{hist.lastNonVisitDate}</td>
+                      <td>{notVisitedReasonCategoryLabel(hist.dominantReasonCategory)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+      {
+        id: 'stage3-detailed-drilldown',
+        render: () => (
+          <GlassCard className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Detailed Drilldown (Top 100)</h2>
+            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+              <table className="table-core min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Week</th>
+                    <th>Customer</th>
+                    <th>Salesperson</th>
+                    <th>Category</th>
+                    <th>Reason Text</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stage3DrilldownRows.map((row, idx) => (
+                    <tr key={idx}>
+                      <td>{row.date}</td>
+                      <td>{row.isoWeek}</td>
+                      <td>{row.customerName}</td>
+                      <td>{row.salesmanName}</td>
+                      <td>{notVisitedReasonCategoryLabel(row.category)}</td>
+                      <td className="max-w-xs truncate" title={row.reason}>
+                        {row.reason}
+                      </td>
+                      <td>
+                        <Badge tone={row.visited === 'no' ? 'error' : 'success'}>
+                          {row.visited === 'no' ? 'Not Visited' : row.visited}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableFrame>
+          </GlassCard>
+        ),
+      },
+    ],
+    [
+      activityData,
+      activityDrilldownRows,
+      callTypeRows,
+      customerTypeRows,
+      dataErrors.activityCompliance,
+      dataErrors.planActual,
+      dataErrors.stage3,
+      planActualData,
+      stage3Data,
+      stage3DrilldownRows,
+      stage3ReasonDistribution,
+      stage3SalespersonRates,
+      stage3TopRepeatedCustomers,
+      stage3WeeklyTrend,
+      visitDrilldownRows,
+      week,
+    ],
+  )
+  const storageKey = useMemo(
+    () => getLayoutStorageKey(user?.id || user?.email || 'anonymous'),
+    [user?.email, user?.id],
+  )
+  const fullRowStorageKey = useMemo(
+    () => getFullRowStorageKey(user?.id || user?.email || 'anonymous'),
+    [user?.email, user?.id],
+  )
+  const [sectionOrder, setSectionOrder] = useState(DEFAULT_LAYOUT)
+  const [fullRowSectionIds, setFullRowSectionIds] = useState([])
+  const [isFullRowHydrated, setIsFullRowHydrated] = useState(false)
+  const userStorageIdentity = user?.id || user?.email || null
+
+  useEffect(() => {
+    if (userStorageIdentity && !migratedLayoutUsersRef.current.has(userStorageIdentity)) {
+      migrateAnonymousLayoutToUser({
+        userStorageKey: storageKey,
+        userFullRowStorageKey: fullRowStorageKey,
+        availableIds: INSIGHTS_SECTION_IDS,
+        fallbackOrder: DEFAULT_LAYOUT,
+      })
+      migratedLayoutUsersRef.current.add(userStorageIdentity)
+    }
+
+    let hasStoredLayout = false
+    try {
+      hasStoredLayout = Boolean(localStorage.getItem(storageKey))
+    } catch {
+      hasStoredLayout = false
+    }
+
+    setSectionOrder(loadLayout(storageKey, INSIGHTS_SECTION_IDS, DEFAULT_LAYOUT))
+    setFullRowSectionIds(
+      loadFullRowSections(
+        fullRowStorageKey,
+        INSIGHTS_SECTION_IDS,
+        hasStoredLayout ? [] : DEFAULT_FULL_ROW_SECTION_IDS,
+      ),
+    )
+    setIsFullRowHydrated(true)
+  }, [fullRowStorageKey, storageKey, userStorageIdentity])
+
+  useEffect(() => {
+    if (!isFullRowHydrated) return
+    const normalized = fullRowSectionIds.filter((id) => INSIGHTS_SECTION_IDS.includes(id))
+    if (normalized.length !== fullRowSectionIds.length) {
+      setFullRowSectionIds(normalized)
+      return
+    }
+    saveFullRowSections(fullRowStorageKey, normalized)
+  }, [fullRowSectionIds, fullRowStorageKey, isFullRowHydrated])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const orderedSectionIds = useMemo(
+    () => normalizeLayout(sectionOrder, INSIGHTS_SECTION_IDS, DEFAULT_LAYOUT),
+    [sectionOrder],
+  )
+  const sectionMap = useMemo(() => {
+    const map = new Map()
+    sectionDescriptors.forEach((section) => map.set(section.id, section))
+    return map
+  }, [sectionDescriptors])
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    setSectionOrder((prev) => {
+      const current = normalizeLayout(prev, INSIGHTS_SECTION_IDS, DEFAULT_LAYOUT)
+      const oldIndex = current.indexOf(String(active.id))
+      const newIndex = current.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0) return current
+      const next = arrayMove(current, oldIndex, newIndex)
+      saveLayout(storageKey, next)
+      return next
+    })
+  }
+
+  const handleToggleFullRow = (sectionId) => {
+    setFullRowSectionIds((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -449,246 +1053,31 @@ function UnifiedAdminSection() {
         </div>
       </GlassCard>
 
-      <GlassCard className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance</h2>
-          <DataWarning message={dataErrors.planActual} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <InsightCard title="Planned Visits" value={String(planActualData?.totals?.plannedVisits || 0)} />
-          <InsightCard title="Actual Visits" value={String(planActualData?.totals?.actualVisits || 0)} />
-          <InsightCard title="Variance" value={String(planActualData?.totals?.variance || 0)} />
-          <InsightCard title="Achievement" value={formatPercent(planActualData?.totals?.achievementRate || 0)} />
-        </div>
-      </GlassCard>
-
-      <GlassCard className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance Snapshot</h2>
-          <DataWarning message={dataErrors.activityCompliance} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <InsightCard title="Compliant" value={String(activityData?.summary?.compliantCount || 0)} />
-          <InsightCard title="Non-Compliant" value={String(activityData?.summary?.nonCompliantCount || 0)} />
-          <InsightCard title="Critical Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.critical || 0)} />
-          <InsightCard title="Warning Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.warning || 0)} />
-        </div>
-      </GlassCard>
-
-      <GlassCard className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Daily Trend</h2>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={planActualData?.dailyTrend || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="plannedVisits" name="Planned" fill="#60a5fa" />
-              <Bar dataKey="actualVisits" name="Actual" fill="#34d399" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </GlassCard>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Summary</h2>
-          <MetricsTable rows={planActualData?.weeklySummary || []} labelKey="isoWeek" labelTitle="Week" />
-        </GlassCard>
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Monthly Rollup</h2>
-          <MetricsTable rows={planActualData?.monthlyRollup || []} labelKey="month" labelTitle="Month" />
-        </GlassCard>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Call Type Split</h2>
-          <MetricsTable rows={callTypeRows} labelKey="label" labelTitle="Call Type" />
-        </GlassCard>
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Customer Type Split</h2>
-          <MetricsTable rows={customerTypeRows} labelKey="label" labelTitle="Customer Type" />
-        </GlassCard>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Over-Achievers</h2>
-          <MetricsTable rows={topOver} labelKey="name" labelTitle="Salesperson" />
-        </GlassCard>
-        <GlassCard className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Top Under-Achievers</h2>
-          <MetricsTable rows={topUnder} labelKey="name" labelTitle="Salesperson" />
-        </GlassCard>
-      </div>
-
-      <GlassCard className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h2>
-        <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-          <table className="table-core min-w-full text-sm">
-            <thead>
-              <tr>
-                <th>Salesperson</th>
-                <th>Main Team</th>
-                <th>Team</th>
-                <th>Sub Team</th>
-                <th>Planned</th>
-                <th>Actual</th>
-                <th>Variance</th>
-                <th>Achievement</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(planActualData?.hierarchyRollups?.salesperson || []).map((row) => (
-                <tr key={row.id}>
-                  <td>{row.name || row.email}</td>
-                  <td>{row.mainTeam || '-'}</td>
-                  <td>{row.team || '-'}</td>
-                  <td>{row.subTeam || '-'}</td>
-                  <td>{row.plannedVisits}</td>
-                  <td>{row.actualVisits}</td>
-                  <td>{row.variance}</td>
-                  <td>{formatPercent(row.achievementRate)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataTableFrame>
-      </GlassCard>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <GlassCard className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Compliance by Salesperson</h2>
-          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-            <table className="table-core min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Salesperson</th>
-                  <th>Team</th>
-                  <th>Total Calls</th>
-                  <th>NC</th>
-                  <th>JSV</th>
-                  <th>FC</th>
-                  <th>SC</th>
-                  <th>Status</th>
-                  <th>Alerts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(activityData?.salespersonCards || []).map((card) => (
-                  <tr key={card.salesman.id}>
-                    <td>{card.salesman.name}</td>
-                    <td>{card.salesman.team}</td>
-                    <td>{card.stats.totalCalls}</td>
-                    <td>{card.stats.ncCount}</td>
-                    <td>{card.stats.jsvCount}</td>
-                    <td>{card.stats.fcCount}</td>
-                    <td>{card.stats.scCount}</td>
-                    <td>
-                      <StatusChip severity={card.alerts.length > 0 ? card.alerts[0].severity : 'compliant'} />
-                    </td>
-                    <td>
-                      <AlertList alerts={card.alerts} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </DataTableFrame>
-        </GlassCard>
-
-        <GlassCard className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Admin Monitoring</h2>
-          <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-            <table className="table-core min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Admin</th>
-                  <th>Total JSV</th>
-                  <th>Status</th>
-                  <th>Top Contributor</th>
-                  <th>Alerts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(activityData?.adminCards || []).map((card) => {
-                  const top = [...card.salespersonBreakdown].sort((a, b) => b.sharePct - a.sharePct)[0]
-                  return (
-                    <tr key={card.admin.id}>
-                      <td>{card.admin.name}</td>
-                      <td>{card.jsvCount}</td>
-                      <td>
-                        <StatusChip
-                          severity={
-                            card.alerts.find((a) => a.severity === 'critical')
-                              ? 'critical'
-                              : card.alerts.length > 0
-                                ? 'warning'
-                                : 'compliant'
-                          }
-                        />
-                      </td>
-                      <td>{top ? `${top.name} (${Math.round(top.sharePct * 100)}%)` : '-'}</td>
-                      <td>
-                        <AlertList alerts={card.alerts} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </DataTableFrame>
-        </GlassCard>
-      </div>
-
-      <GlassCard className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h2>
-        <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-          <table className="table-core min-w-full text-sm">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th>Date</th>
-                <th>Week</th>
-                <th>Salesperson</th>
-                <th>Team</th>
-                <th>Customer</th>
-                <th>Type</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visitDrilldownRows.map((row, index) => (
-                <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
-                  <td>Visits</td>
-                  <td>{row.date || '-'}</td>
-                  <td>{row.isoWeek || '-'}</td>
-                  <td>{row.salesman?.name || row.salesman?.email || '-'}</td>
-                  <td>{row.salesman?.team || '-'}</td>
-                  <td>{row.customerName || '-'}</td>
-                  <td>{formatCallType(row.callType)}</td>
-                  <td>{row.visited ? 'Visited' : 'Planned only'}</td>
-                </tr>
-              ))}
-              {activityDrilldownRows.map((row, index) => (
-                <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
-                  <td>Compliance</td>
-                  <td>{row.date || '-'}</td>
-                  <td>{week || '-'}</td>
-                  <td>{row.salesperson?.name || '-'}</td>
-                  <td>{row.salesperson?.team || '-'}</td>
-                  <td>{row.customerName || '-'}</td>
-                  <td>{String(row.type || '-').toUpperCase()}</td>
-                  <td>{row.type ? 'Logged' : '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataTableFrame>
-      </GlassCard>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={orderedSectionIds} strategy={rectSortingStrategy}>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {orderedSectionIds.map((sectionId) => {
+              const section = sectionMap.get(sectionId)
+              if (!section) return null
+              return (
+                <DraggableSection
+                  key={sectionId}
+                  id={sectionId}
+                  className={fullRowSectionIds.includes(sectionId) ? 'h-full xl:col-span-2' : 'h-full'}
+                  isFullRow={fullRowSectionIds.includes(sectionId)}
+                  onToggleFullRow={handleToggleFullRow}
+                >
+                  {section.render()}
+                </DraggableSection>
+              )
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   )
 }
@@ -704,7 +1093,6 @@ export default function AdminPage() {
         </GlassCard>
 
         <UnifiedAdminSection />
-        <Stage3PlannedNotVisitedSection />
       </PageSurface>
     </PageEnter>
   )
