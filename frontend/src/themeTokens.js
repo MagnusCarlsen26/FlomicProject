@@ -1,32 +1,79 @@
 const CHART_THEME = {
   light: {
-    grid: '#bfd0e6',
-    axis: '#5e7698',
-    tooltipBg: '#ffffff',
-    tooltipText: '#11233d',
-    planned: '#6b7f9c',
-    actual: '#1ea2e6',
-    enquiries: '#0d85cb',
-    shipments: '#0f9f81',
-    conversionA: '#2788f0',
-    conversionB: '#8d6bf6',
-    pie: ['#1ea2e6', '#14b894', '#f2a231', '#8d6bf6'],
+    series: {
+      primary: '#1976d2',
+      secondary: '#0f9f81',
+      tertiary: '#dd7a12',
+      quaternary: '#7b61ff',
+    },
+    status: {
+      good: '#0f9f81',
+      warn: '#dd7a12',
+      bad: '#cf2f4e',
+      neutral: '#5f7899',
+    },
+    grid: {
+      subtle: '#bfd0e6',
+    },
+    axis: {
+      default: '#4f6585',
+    },
+    tooltip: {
+      bg: '#ffffff',
+      text: '#11233d',
+    },
+    focus: {
+      ring: '#1976d2',
+    },
+    categorical: ['#1976d2', '#0f9f81', '#dd7a12', '#7b61ff', '#b14491', '#4b7e9f'],
+    sequential: ['#dbeafe', '#a7d0fb', '#6caef6', '#2c8ae5', '#0f5eb3'],
   },
   dark: {
-    grid: '#3f5b82',
-    axis: '#a6c5ea',
-    tooltipBg: '#1a2a44',
-    tooltipText: '#ddedff',
-    planned: '#93abc9',
-    actual: '#43c0ff',
-    enquiries: '#66cfff',
-    shipments: '#4cd7b7',
-    conversionA: '#6db0ff',
-    conversionB: '#b69cff',
-    pie: ['#43c0ff', '#4cd7b7', '#f9bd67', '#b69cff'],
+    series: {
+      primary: '#54b8ff',
+      secondary: '#41cfa9',
+      tertiary: '#f1b15f',
+      quaternary: '#b39dff',
+    },
+    status: {
+      good: '#41cfa9',
+      warn: '#f1b15f',
+      bad: '#ff8ca5',
+      neutral: '#a5bedf',
+    },
+    grid: {
+      subtle: '#4b658c',
+    },
+    axis: {
+      default: '#b6ccec',
+    },
+    tooltip: {
+      bg: '#1a2a44',
+      text: '#ddedff',
+    },
+    focus: {
+      ring: '#54b8ff',
+    },
+    categorical: ['#54b8ff', '#41cfa9', '#f1b15f', '#b39dff', '#e886d0', '#7cb6da'],
+    sequential: ['#163253', '#1e4f80', '#2673b3', '#3d98d8', '#73c2f5'],
   },
 }
 
 export function getChartTheme(resolvedTheme) {
-  return resolvedTheme === 'dark' ? CHART_THEME.dark : CHART_THEME.light
+  const base = resolvedTheme === 'dark' ? CHART_THEME.dark : CHART_THEME.light
+  return {
+    ...base,
+    // Backward-compatible aliases for existing chart components.
+    gridColor: base.grid.subtle,
+    axisColor: base.axis.default,
+    tooltipBg: base.tooltip.bg,
+    tooltipText: base.tooltip.text,
+    planned: base.status.neutral,
+    actual: base.series.secondary,
+    enquiries: base.series.primary,
+    shipments: base.series.secondary,
+    conversionA: base.series.primary,
+    conversionB: base.series.quaternary,
+    pie: base.categorical,
+  }
 }

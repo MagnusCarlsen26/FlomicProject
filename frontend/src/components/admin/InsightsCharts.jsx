@@ -46,9 +46,9 @@ export default function InsightsCharts({ charts }) {
   const productivityByWeekday = charts?.productivityByWeekday || []
 
   const tooltipStyle = {
-    backgroundColor: chartTheme.tooltipBg,
-    color: chartTheme.tooltipText,
-    border: `1px solid ${chartTheme.grid}`,
+    backgroundColor: chartTheme.tooltip.bg,
+    color: chartTheme.tooltip.text,
+    border: `1px solid ${chartTheme.grid.subtle}`,
     borderRadius: '0.85rem',
     fontSize: '12px',
   }
@@ -60,13 +60,13 @@ export default function InsightsCharts({ charts }) {
           <ChartPanel title="Productivity by Day of Week">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={productivityByWeekday}>
-                <CartesianGrid stroke={chartTheme.grid} strokeDasharray="3 3" />
-                <XAxis dataKey="day" tick={{ fill: chartTheme.axis }} />
-                <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis }} />
+                <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
+                <XAxis dataKey="day" tick={{ fill: chartTheme.axis.default }} />
+                <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.default }} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend />
-                <Bar dataKey="enquiries" fill={chartTheme.enquiries} name="Enquiries" />
-                <Bar dataKey="shipments" fill={chartTheme.shipments} name="Shipments" />
+                <Bar dataKey="enquiries" fill={chartTheme.series.primary} name="Enquiries" />
+                <Bar dataKey="shipments" fill={chartTheme.series.secondary} name="Shipments" />
               </BarChart>
             </ResponsiveContainer>
           </ChartPanel>
@@ -78,15 +78,15 @@ export default function InsightsCharts({ charts }) {
           <ChartPanel title="Conversion by Customer Type">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={conversionByCustomerType}>
-                <CartesianGrid stroke={chartTheme.grid} strokeDasharray="3 3" />
-                <XAxis dataKey="customerType" tick={{ fill: chartTheme.axis }} />
+                <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
+                <XAxis dataKey="customerType" tick={{ fill: chartTheme.axis.default }} />
                 <YAxis
                   domain={[0, 1]}
-                  tick={{ fill: chartTheme.axis }}
+                  tick={{ fill: chartTheme.axis.default }}
                   tickFormatter={(value) => `${Math.round(value * 100)}%`}
                 />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${(value * 100).toFixed(1)}%`} />
-                <Bar dataKey="conversionRate" fill={chartTheme.conversionA} name="Conversion Rate" />
+                <Bar dataKey="conversionRate" fill={chartTheme.series.primary} name="Conversion Rate" />
               </BarChart>
             </ResponsiveContainer>
           </ChartPanel>
@@ -94,15 +94,15 @@ export default function InsightsCharts({ charts }) {
           <ChartPanel title="Conversion by Visit Type">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={conversionByVisitType}>
-                <CartesianGrid stroke={chartTheme.grid} strokeDasharray="3 3" />
-                <XAxis dataKey="visitType" tick={{ fill: chartTheme.axis }} />
+                <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
+                <XAxis dataKey="visitType" tick={{ fill: chartTheme.axis.default }} />
                 <YAxis
                   domain={[0, 1]}
-                  tick={{ fill: chartTheme.axis }}
+                  tick={{ fill: chartTheme.axis.default }}
                   tickFormatter={(value) => `${Math.round(value * 100)}%`}
                 />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${(value * 100).toFixed(1)}%`} />
-                <Bar dataKey="conversionRate" fill={chartTheme.conversionB} name="Conversion Rate" />
+                <Bar dataKey="conversionRate" fill={chartTheme.series.quaternary} name="Conversion Rate" />
               </BarChart>
             </ResponsiveContainer>
           </ChartPanel>
@@ -112,7 +112,7 @@ export default function InsightsCharts({ charts }) {
               <PieChart>
                 <Pie data={contactDistribution} dataKey="count" nameKey="type" outerRadius={100} label>
                   {contactDistribution.map((entry, index) => (
-                    <Cell key={entry.type} fill={chartTheme.pie[index % chartTheme.pie.length]} />
+                    <Cell key={entry.type} fill={chartTheme.categorical[index % chartTheme.categorical.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />

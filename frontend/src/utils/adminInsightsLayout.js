@@ -14,21 +14,13 @@ export const DEFAULT_LAYOUT = [
   'call-type-split',
   'customer-type-split',
   'compliance-by-salesperson',
-  'salesperson-rollup',
-  'recent-activity',
-  'stage3-salesperson-non-visit-rates',
-  'stage3-repeated-non-visits',
-  'stage3-detailed-drilldown',
+  'more-insights',
 ]
 
 export const DEFAULT_FULL_ROW_SECTION_IDS = [
   'daily-trend',
   'visit-performance',
-  'recent-activity',
-  'salesperson-rollup',
-  'stage3-repeated-non-visits',
-  'stage3-salesperson-non-visit-rates',
-  'stage3-detailed-drilldown',
+  'more-insights',
 ]
 
 export function getLayoutStorageKey(userId) {

@@ -2,8 +2,8 @@ import { cn } from './cn'
 
 const VARIANT_CLASS = {
   primary: 'bg-primary text-white shadow-glow hover:brightness-110',
-  secondary: 'bg-surface-muted text-text-primary border border-border-strong hover:bg-surface',
-  ghost: 'bg-transparent text-text-secondary hover:bg-surface-muted',
+  secondary: 'bg-surface-3 text-text-primary border border-border-default hover:bg-surface-4',
+  ghost: 'bg-transparent text-text-secondary hover:bg-surface-2 hover:text-text-primary',
   danger: 'bg-error text-white hover:brightness-110',
 }
 

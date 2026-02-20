@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DraggableSection from '../components/admin/DraggableSection'
 import InsightCard from '../components/admin/InsightCard'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
 import { notVisitedReasonCategoryLabel } from '../constants/weeklyReportFields'
 import { useAuth } from '../context/useAuth'
+import { useTheme } from '../context/useTheme'
 import Alert from '../components/ui/Alert'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -36,15 +37,14 @@ import {
   saveLayout,
 } from '../utils/adminInsightsLayout'
 import { formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
+import { getChartTheme } from '../themeTokens'
 
 const ADMIN_TABLE_FRAME_CLASS = 'max-h-[34rem] overflow-y-auto'
 const INSIGHTS_SECTION_IDS = DEFAULT_LAYOUT
-const STAGE3_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8']
 const SECTION_TITLES = {
-  'visit-performance': 'Visit Performance + Stage 3',
+  'visit-performance': 'Visit Performance',
   'compliance-snapshot': 'Compliance Snapshot',
   'daily-trend': 'Daily Trend',
-  'stage3-reason-distribution': 'Reason Distribution',
   'stage3-weekly-trend': 'Weekly Trend (Non-Visit Rate)',
   'weekly-summary': 'Weekly Summary',
   'monthly-rollup': 'Monthly Rollup',
@@ -53,11 +53,7 @@ const SECTION_TITLES = {
   'call-type-split': 'Call Type Split',
   'customer-type-split': 'Customer Type Split',
   'compliance-by-salesperson': 'Compliance by Salesperson',
-  'salesperson-rollup': 'Salesperson Performance Rollup',
-  'recent-activity': 'Recent Activity / Drilldown',
-  'stage3-salesperson-non-visit-rates': 'Salesperson Non-Visit Rates',
-  'stage3-repeated-non-visits': 'Repeated Non-Visits (Last 8 Weeks)',
-  'stage3-detailed-drilldown': 'Detailed Drilldown (Top 100)',
+  'more-insights': 'More Insights',
 }
 
 function formatCallType(callType) {
@@ -105,10 +101,10 @@ function MetricsTable({ rows, labelKey, labelTitle }) {
 }
 
 function StatusChip({ severity }) {
-  const base = 'px-2 py-0.5 rounded-full text-xs font-bold uppercase'
-  if (severity === 'critical') return <span className={`${base} bg-red-100 text-red-700`}>Critical</span>
-  if (severity === 'warning') return <span className={`${base} bg-yellow-100 text-yellow-700`}>Warning</span>
-  return <span className={`${base} bg-green-100 text-green-700`}>Compliant</span>
+  const base = 'px-2 py-0.5 rounded-full border text-xs font-bold uppercase'
+  if (severity === 'critical') return <span className={`${base} border-error/40 bg-error-soft text-error`}>Critical</span>
+  if (severity === 'warning') return <span className={`${base} border-warning/40 bg-warning-soft text-warning`}>Warning</span>
+  return <span className={`${base} border-success/40 bg-success-soft text-success`}>Compliant</span>
 }
 
 function AlertList({ alerts }) {
@@ -132,6 +128,7 @@ function DataWarning({ tone = 'warning', message }) {
 
 function UnifiedAdminSection() {
   const { user } = useAuth()
+  const { resolvedTheme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -355,13 +352,20 @@ function UnifiedAdminSection() {
   const visitDrilldownRows = useMemo(() => (planActualData?.drilldownRows || []).slice(0, 25), [planActualData])
   const activityDrilldownRows = useMemo(() => (activityData?.drilldown || []).slice(0, 25), [activityData])
   const stage3WeeklyTrend = useMemo(() => stage3Data?.weeklyTrend || [], [stage3Data])
-  const stage3ReasonDistribution = (stage3Data?.reasonDistribution || []).map((item) => ({
-    name: notVisitedReasonCategoryLabel(item.reasonCategory),
-    value: item.count,
-  }))
   const stage3SalespersonRates = useMemo(() => stage3Data?.salespersonRates || [], [stage3Data])
   const stage3TopRepeatedCustomers = useMemo(() => stage3Data?.topRepeatedCustomers || [], [stage3Data])
   const stage3DrilldownRows = useMemo(() => stage3Data?.drilldownRows || [], [stage3Data])
+  const chartTheme = useMemo(() => getChartTheme(resolvedTheme), [resolvedTheme])
+  const chartTooltipStyle = useMemo(
+    () => ({
+      backgroundColor: chartTheme.tooltip.bg,
+      color: chartTheme.tooltip.text,
+      border: `1px solid ${chartTheme.grid.subtle}`,
+      borderRadius: '0.85rem',
+      fontSize: '12px',
+    }),
+    [chartTheme],
+  )
   const sectionDescriptors = useMemo(
     () => [
       {
@@ -369,18 +373,18 @@ function UnifiedAdminSection() {
         render: () => (
           <GlassCard className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance + Stage 3</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <DataWarning message={dataErrors.planActual} />
                 <DataWarning message={dataErrors.stage3} />
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <InsightCard title="Planned Visits" value={String(planActualData?.totals?.plannedVisits || 0)} />
-              <InsightCard title="Actual Visits" value={String(planActualData?.totals?.actualVisits || 0)} />
-              <InsightCard title="Achievement" value={formatPercent(planActualData?.totals?.achievementRate || 0)} />
-              <InsightCard title="Missed Visits" value={String(stage3Data?.totals?.plannedButNotVisitedCount || 0)} />
-              <InsightCard title="Non-Visit Rate" value={formatPercent(stage3Data?.totals?.nonVisitRate || 0)} />
+              <InsightCard title="Planned Visits" value={String(planActualData?.totals?.plannedVisits || 0)} variant="info" />
+              <InsightCard title="Actual Visits" value={String(planActualData?.totals?.actualVisits || 0)} variant="success" />
+              <InsightCard title="Achievement" value={formatPercent(planActualData?.totals?.achievementRate || 0)} variant="success" />
+              <InsightCard title="Missed Visits" value={String(stage3Data?.totals?.plannedButNotVisitedCount || 0)} variant="danger" />
+              <InsightCard title="Non-Visit Rate" value={formatPercent(stage3Data?.totals?.nonVisitRate || 0)} variant="warning" />
             </div>
           </GlassCard>
         ),
@@ -394,10 +398,10 @@ function UnifiedAdminSection() {
               <DataWarning message={dataErrors.activityCompliance} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <InsightCard title="Compliant" value={String(activityData?.summary?.compliantCount || 0)} />
-              <InsightCard title="Non-Compliant" value={String(activityData?.summary?.nonCompliantCount || 0)} />
-              <InsightCard title="Critical Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.critical || 0)} />
-              <InsightCard title="Warning Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.warning || 0)} />
+              <InsightCard title="Compliant" value={String(activityData?.summary?.compliantCount || 0)} variant="success" />
+              <InsightCard title="Non-Compliant" value={String(activityData?.summary?.nonCompliantCount || 0)} variant="danger" />
+              <InsightCard title="Critical Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.critical || 0)} variant="danger" />
+              <InsightCard title="Warning Alerts" value={String(activityData?.summary?.alertBreakdown?.severity?.warning || 0)} variant="warning" />
             </div>
           </GlassCard>
         ),
@@ -410,13 +414,13 @@ function UnifiedAdminSection() {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={planActualData?.dailyTrend || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
+                  <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fill: chartTheme.axis.default }} />
+                  <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.default }} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                   <Legend />
-                  <Bar dataKey="plannedVisits" name="Planned" fill="#60a5fa" />
-                  <Bar dataKey="actualVisits" name="Actual" fill="#34d399" />
+                  <Bar dataKey="plannedVisits" name="Planned" fill={chartTheme.status.neutral} />
+                  <Bar dataKey="actualVisits" name="Actual" fill={chartTheme.series.secondary} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -478,44 +482,6 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'salesperson-rollup',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h2>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Salesperson</th>
-                    <th>Main Team</th>
-                    <th>Team</th>
-                    <th>Sub Team</th>
-                    <th>Planned</th>
-                    <th>Actual</th>
-                    <th>Variance</th>
-                    <th>Achievement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(planActualData?.hierarchyRollups?.salesperson || []).map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.name || row.email}</td>
-                      <td>{row.mainTeam || '-'}</td>
-                      <td>{row.team || '-'}</td>
-                      <td>{row.subTeam || '-'}</td>
-                      <td>{row.plannedVisits}</td>
-                      <td>{row.actualVisits}</td>
-                      <td>{row.variance}</td>
-                      <td>{formatPercent(row.achievementRate)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
         id: 'compliance-by-salesperson',
         render: () => (
           <GlassCard className="space-y-4">
@@ -560,56 +526,6 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'recent-activity',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h2>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th>Date</th>
-                    <th>Week</th>
-                    <th>Salesperson</th>
-                    <th>Team</th>
-                    <th>Customer</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visitDrilldownRows.map((row, index) => (
-                    <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
-                      <td>Visits</td>
-                      <td>{row.date || '-'}</td>
-                      <td>{row.isoWeek || '-'}</td>
-                      <td>{row.salesman?.name || row.salesman?.email || '-'}</td>
-                      <td>{row.salesman?.team || '-'}</td>
-                      <td>{row.customerName || '-'}</td>
-                      <td>{formatCallType(row.callType)}</td>
-                      <td>{row.visited ? 'Visited' : 'Planned only'}</td>
-                    </tr>
-                  ))}
-                  {activityDrilldownRows.map((row, index) => (
-                    <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
-                      <td>Compliance</td>
-                      <td>{row.date || '-'}</td>
-                      <td>{week || '-'}</td>
-                      <td>{row.salesperson?.name || '-'}</td>
-                      <td>{row.salesperson?.team || '-'}</td>
-                      <td>{row.customerName || '-'}</td>
-                      <td>{String(row.type || '-').toUpperCase()}</td>
-                      <td>{row.type ? 'Logged' : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
         id: 'stage3-weekly-trend',
         render: () => (
           <GlassCard className="space-y-4">
@@ -617,12 +533,12 @@ function UnifiedAdminSection() {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stage3WeeklyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="isoWeek" />
-                  <YAxis tickFormatter={formatPercent} />
-                  <Tooltip formatter={(val) => formatPercent(val)} />
+                  <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
+                  <XAxis dataKey="isoWeek" tick={{ fill: chartTheme.axis.default }} />
+                  <YAxis tickFormatter={formatPercent} tick={{ fill: chartTheme.axis.default }} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(val) => formatPercent(val)} />
                   <Legend />
-                  <Bar dataKey="nonVisitRate" name="Non-Visit Rate" fill="#60a5fa" />
+                  <Bar dataKey="nonVisitRate" name="Non-Visit Rate" fill={chartTheme.status.warn} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -630,139 +546,185 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'stage3-reason-distribution',
+        id: 'more-insights',
         render: () => (
           <GlassCard className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Reason Distribution</h2>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stage3ReasonDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                  >
-                    {stage3ReasonDistribution.map((entry, index) => (
-                      <Cell key={`stage3-reason-${entry.name}-${index}`} fill={STAGE3_COLORS[index % STAGE3_COLORS.length]} />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">More Insights</h2>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Performance Rollup</h3>
+              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+                <table className="table-core min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Salesperson</th>
+                      <th>Main Team</th>
+                      <th>Team</th>
+                      <th>Sub Team</th>
+                      <th>Planned</th>
+                      <th>Actual</th>
+                      <th>Variance</th>
+                      <th>Achievement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(planActualData?.hierarchyRollups?.salesperson || []).map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.name || row.email}</td>
+                        <td>{row.mainTeam || '-'}</td>
+                        <td>{row.team || '-'}</td>
+                        <td>{row.subTeam || '-'}</td>
+                        <td>{row.plannedVisits}</td>
+                        <td>{row.actualVisits}</td>
+                        <td>{row.variance}</td>
+                        <td>{formatPercent(row.achievementRate)}</td>
+                      </tr>
                     ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'stage3-salesperson-non-visit-rates',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Non-Visit Rates</h2>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Salesperson</th>
-                    <th>Planned</th>
-                    <th>Missed</th>
-                    <th>Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stage3SalespersonRates.map((sr) => (
-                    <tr key={sr.id}>
-                      <td>{sr.name}</td>
-                      <td>{sr.plannedVisits}</td>
-                      <td>{sr.nonVisitedCount}</td>
-                      <td className="font-semibold text-primary">{formatPercent(sr.nonVisitRate)}</td>
+                  </tbody>
+                </table>
+              </DataTableFrame>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recent Activity / Drilldown</h3>
+              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+                <table className="table-core min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Date</th>
+                      <th>Week</th>
+                      <th>Salesperson</th>
+                      <th>Team</th>
+                      <th>Customer</th>
+                      <th>Type</th>
+                      <th>Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'stage3-repeated-non-visits',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Repeated Non-Visits (Last 8 Weeks)</h2>
-              <Badge tone="warning">Threshold: &ge; 2 weeks</Badge>
-            </div>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Salesperson</th>
-                    <th>Weeks</th>
-                    <th>Latest Date</th>
-                    <th>Dominant Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stage3TopRepeatedCustomers.map((hist, idx) => (
-                    <tr key={idx}>
-                      <td className="font-semibold">{hist.customerName}</td>
-                      <td>{hist.salesmanName}</td>
-                      <td>{hist.occurrences8w}</td>
-                      <td>{hist.lastNonVisitDate}</td>
-                      <td>{notVisitedReasonCategoryLabel(hist.dominantReasonCategory)}</td>
+                  </thead>
+                  <tbody>
+                    {visitDrilldownRows.map((row, index) => (
+                      <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
+                        <td>Visits</td>
+                        <td>{row.date || '-'}</td>
+                        <td>{row.isoWeek || '-'}</td>
+                        <td>{row.salesman?.name || row.salesman?.email || '-'}</td>
+                        <td>{row.salesman?.team || '-'}</td>
+                        <td>{row.customerName || '-'}</td>
+                        <td>{formatCallType(row.callType)}</td>
+                        <td>{row.visited ? 'Visited' : 'Planned only'}</td>
+                      </tr>
+                    ))}
+                    {activityDrilldownRows.map((row, index) => (
+                      <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
+                        <td>Compliance</td>
+                        <td>{row.date || '-'}</td>
+                        <td>{week || '-'}</td>
+                        <td>{row.salesperson?.name || '-'}</td>
+                        <td>{row.salesperson?.team || '-'}</td>
+                        <td>{row.customerName || '-'}</td>
+                        <td>{String(row.type || '-').toUpperCase()}</td>
+                        <td>{row.type ? 'Logged' : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DataTableFrame>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Salesperson Non-Visit Rates</h3>
+              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+                <table className="table-core min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Salesperson</th>
+                      <th>Planned</th>
+                      <th>Missed</th>
+                      <th>Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'stage3-detailed-drilldown',
-        render: () => (
-          <GlassCard className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Detailed Drilldown (Top 100)</h2>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Week</th>
-                    <th>Customer</th>
-                    <th>Salesperson</th>
-                    <th>Category</th>
-                    <th>Reason Text</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stage3DrilldownRows.map((row, idx) => (
-                    <tr key={idx}>
-                      <td>{row.date}</td>
-                      <td>{row.isoWeek}</td>
-                      <td>{row.customerName}</td>
-                      <td>{row.salesmanName}</td>
-                      <td>{notVisitedReasonCategoryLabel(row.category)}</td>
-                      <td className="max-w-xs truncate" title={row.reason}>
-                        {row.reason}
-                      </td>
-                      <td>
-                        <Badge tone={row.visited === 'no' ? 'error' : 'success'}>
-                          {row.visited === 'no' ? 'Not Visited' : row.visited}
-                        </Badge>
-                      </td>
+                  </thead>
+                  <tbody>
+                    {stage3SalespersonRates.map((sr) => (
+                      <tr key={sr.id}>
+                        <td>{sr.name}</td>
+                        <td>{sr.plannedVisits}</td>
+                        <td>{sr.nonVisitedCount}</td>
+                        <td className="font-semibold text-warning">{formatPercent(sr.nonVisitRate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DataTableFrame>
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Repeated Non-Visits (Last 8 Weeks)</h3>
+                <Badge tone="warning">Threshold: &ge; 2 weeks</Badge>
+              </div>
+              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+                <table className="table-core min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Salesperson</th>
+                      <th>Weeks</th>
+                      <th>Latest Date</th>
+                      <th>Dominant Reason</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTableFrame>
+                  </thead>
+                  <tbody>
+                    {stage3TopRepeatedCustomers.map((hist, idx) => (
+                      <tr key={idx}>
+                        <td className="font-semibold">{hist.customerName}</td>
+                        <td>{hist.salesmanName}</td>
+                        <td>{hist.occurrences8w}</td>
+                        <td>{hist.lastNonVisitDate}</td>
+                        <td>{notVisitedReasonCategoryLabel(hist.dominantReasonCategory)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DataTableFrame>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Detailed Drilldown (Top 100)</h3>
+              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
+                <table className="table-core min-w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Week</th>
+                      <th>Customer</th>
+                      <th>Salesperson</th>
+                      <th>Category</th>
+                      <th>Reason Text</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stage3DrilldownRows.map((row, idx) => (
+                      <tr key={idx}>
+                        <td>{row.date}</td>
+                        <td>{row.isoWeek}</td>
+                        <td>{row.customerName}</td>
+                        <td>{row.salesmanName}</td>
+                        <td>{notVisitedReasonCategoryLabel(row.category)}</td>
+                        <td className="max-w-xs truncate" title={row.reason}>
+                          {row.reason}
+                        </td>
+                        <td>
+                          <Badge tone={row.visited === 'no' ? 'error' : 'success'}>
+                            {row.visited === 'no' ? 'Not Visited' : row.visited}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DataTableFrame>
+            </section>
           </GlassCard>
         ),
       },
@@ -778,12 +740,13 @@ function UnifiedAdminSection() {
       planActualData,
       stage3Data,
       stage3DrilldownRows,
-      stage3ReasonDistribution,
       stage3SalespersonRates,
       stage3TopRepeatedCustomers,
       stage3WeeklyTrend,
       visitDrilldownRows,
       week,
+      chartTheme,
+      chartTooltipStyle,
     ],
   )
   const storageKey = useMemo(
@@ -941,7 +904,7 @@ function UnifiedAdminSection() {
 
         <p className="text-sm text-text-secondary">Last refresh: {formatDateTime(lastPolledAt)}</p>
 
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface/50 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border-default bg-surface-2/90 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Week</label>
             <Input type="week" value={week} onChange={(e) => setWeek(e.target.value)} />
@@ -1011,7 +974,7 @@ function UnifiedAdminSection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface/40 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border-default bg-surface-3/75 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">From Date</label>
             <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} disabled={Boolean(week || month)} />
