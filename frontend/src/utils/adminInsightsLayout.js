@@ -6,7 +6,6 @@ export const DEFAULT_LAYOUT = [
   'compliance-snapshot',
   'daily-trend',
   'stage3-reason-distribution',
-  'stage3-weekly-trend',
   'weekly-summary',
   'monthly-rollup',
   'top-over-achievers',

@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DraggableSection from '../components/admin/DraggableSection'
 import InsightCard from '../components/admin/InsightCard'
 import PageSurface from '../components/layout/PageSurface'
 import PageEnter from '../components/motion/PageEnter'
-import { notVisitedReasonCategoryLabel } from '../constants/weeklyReportFields'
 import { useAuth } from '../context/useAuth'
 import { useTheme } from '../context/useTheme'
 import Alert from '../components/ui/Alert'
-import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DataTableFrame from '../components/ui/DataTableFrame'
 import GlassCard from '../components/ui/GlassCard'
@@ -45,7 +43,6 @@ const SECTION_TITLES = {
   'visit-performance': 'Visit Performance',
   'compliance-snapshot': 'Compliance Snapshot',
   'daily-trend': 'Daily Trend',
-  'stage3-weekly-trend': 'Weekly Trend (Non-Visit Rate)',
   'weekly-summary': 'Weekly Summary',
   'monthly-rollup': 'Monthly Rollup',
   'top-over-achievers': 'Top Over-Achievers',
@@ -65,6 +62,45 @@ function formatCustomerType(customerType) {
   if (customerType === 'targeted_budgeted') return 'Targeted (Budgeted)'
   if (customerType === 'existing') return 'Existing'
   return 'Unknown'
+}
+
+function formatMonthDayLabel(dateValue) {
+  if (!dateValue) return '-'
+  const date = new Date(`${dateValue}T00:00:00.000Z`)
+  if (Number.isNaN(date.getTime())) return dateValue
+  const month = date.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
+  const day = date.toLocaleDateString(undefined, { day: 'numeric', timeZone: 'UTC' })
+  return `${month} - ${day}`
+}
+
+function isoWeekToMondayDate(isoWeek) {
+  const match = /^([0-9]{4})-W([0-9]{2})$/.exec(String(isoWeek || ''))
+  if (!match) return null
+  const year = Number(match[1])
+  const week = Number(match[2])
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Day = jan4.getUTCDay() || 7
+  const week1Monday = new Date(jan4)
+  week1Monday.setUTCDate(jan4.getUTCDate() + 1 - jan4Day)
+  const monday = new Date(week1Monday)
+  monday.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7)
+  return monday
+}
+
+function formatIsoWeekAsMonthDay(isoWeek) {
+  const monday = isoWeekToMondayDate(isoWeek)
+  if (!monday) return isoWeek || '-'
+  const month = monday.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
+  const day = monday.toLocaleDateString(undefined, { day: 'numeric', timeZone: 'UTC' })
+  return `${month} - ${day}`
+}
+
+function formatMonthLabel(monthValue) {
+  const match = /^([0-9]{4})-([0-9]{2})$/.exec(String(monthValue || ''))
+  if (!match) return monthValue || '-'
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1))
+  if (Number.isNaN(date.getTime())) return monthValue || '-'
+  return date.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
 }
 
 function MetricsTable({ rows, labelKey, labelTitle }) {
@@ -379,10 +415,18 @@ function UnifiedAdminSection() {
 
   const visitDrilldownRows = useMemo(() => (planActualData?.drilldownRows || []).slice(0, 25), [planActualData])
   const activityDrilldownRows = useMemo(() => (activityData?.drilldown || []).slice(0, 25), [activityData])
-  const stage3WeeklyTrend = useMemo(() => stage3Data?.weeklyTrend || [], [stage3Data])
-  const stage3SalespersonRates = useMemo(() => stage3Data?.salespersonRates || [], [stage3Data])
-  const stage3TopRepeatedCustomers = useMemo(() => stage3Data?.topRepeatedCustomers || [], [stage3Data])
-  const stage3DrilldownRows = useMemo(() => stage3Data?.drilldownRows || [], [stage3Data])
+  const dailyTrendRows = useMemo(
+    () => (planActualData?.dailyTrend || []).map((row) => ({ ...row, dateLabel: formatMonthDayLabel(row.date) })),
+    [planActualData],
+  )
+  const weeklySummaryRows = useMemo(
+    () => (planActualData?.weeklySummary || []).map((row) => ({ ...row, weekLabel: formatIsoWeekAsMonthDay(row.isoWeek) })),
+    [planActualData],
+  )
+  const monthlyRollupRows = useMemo(
+    () => (planActualData?.monthlyRollup || []).map((row) => ({ ...row, monthLabel: formatMonthLabel(row.month) })),
+    [planActualData],
+  )
   const chartTheme = useMemo(() => getChartTheme(resolvedTheme), [resolvedTheme])
   const chartTooltipStyle = useMemo(
     () => ({
@@ -441,15 +485,15 @@ function UnifiedAdminSection() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Daily Trend</h2>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={planActualData?.dailyTrend || []}>
+                <LineChart data={dailyTrendRows}>
                   <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fill: chartTheme.axis.default }} />
+                  <XAxis dataKey="dateLabel" tick={{ fill: chartTheme.axis.default }} interval={6} />
                   <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.default }} />
                   <Tooltip contentStyle={chartTooltipStyle} />
                   <Legend />
-                  <Bar dataKey="plannedVisits" name="Planned" fill={chartTheme.status.neutral} />
-                  <Bar dataKey="actualVisits" name="Actual" fill={chartTheme.series.secondary} />
-                </BarChart>
+                  <Line dataKey="plannedVisits" name="Planned" stroke={chartTheme.status.neutral} strokeWidth={2} dot={false} />
+                  <Line dataKey="actualVisits" name="Actual" stroke={chartTheme.series.secondary} strokeWidth={2} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </GlassCard>
@@ -460,7 +504,7 @@ function UnifiedAdminSection() {
         render: () => (
           <GlassCard className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Summary</h2>
-            <MetricsTable rows={planActualData?.weeklySummary || []} labelKey="isoWeek" labelTitle="Week" />
+            <MetricsTable rows={weeklySummaryRows} labelKey="weekLabel" labelTitle="Week" />
           </GlassCard>
         ),
       },
@@ -469,7 +513,7 @@ function UnifiedAdminSection() {
         render: () => (
           <GlassCard className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Monthly Rollup</h2>
-            <MetricsTable rows={planActualData?.monthlyRollup || []} labelKey="month" labelTitle="Month" />
+            <MetricsTable rows={monthlyRollupRows} labelKey="monthLabel" labelTitle="Month" />
           </GlassCard>
         ),
       },
@@ -518,11 +562,9 @@ function UnifiedAdminSection() {
               <table className="table-core min-w-full text-sm">
                 <thead>
                   <tr>
-                    <th>Member</th>
-                    <th>Role</th>
-                    <th>Main Team</th>
-                    <th>Team</th>
                     <th>Sub Team</th>
+                    <th>Team</th>
+                    <th>Main Team</th>
                     <th>Weekly JSV</th>
                     <th>JSV Bar</th>
                     <th>Status</th>
@@ -536,11 +578,9 @@ function UnifiedAdminSection() {
                     })
                     .map((card) => (
                     <tr key={card.member.id}>
-                      <td>{card.member.name || card.member.email}</td>
-                      <td>{String(card.member.role || '-').toUpperCase()}</td>
-                      <td>{card.member.mainTeam || '-'}</td>
-                      <td>{card.member.team || '-'}</td>
                       <td>{card.member.subTeam || '-'}</td>
+                      <td>{card.member.team || '-'}</td>
+                      <td>{card.member.mainTeam || '-'}</td>
                       <td>{card.stats.jsvCount}</td>
                       <td>
                         <JsvProgressBar jsvCount={card.stats.jsvCount || 0} />
@@ -553,26 +593,6 @@ function UnifiedAdminSection() {
                 </tbody>
               </table>
             </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'stage3-weekly-trend',
-        render: () => (
-          <GlassCard className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Weekly Trend (Non-Visit Rate)</h2>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stage3WeeklyTrend}>
-                  <CartesianGrid stroke={chartTheme.grid.subtle} strokeDasharray="3 3" />
-                  <XAxis dataKey="isoWeek" tick={{ fill: chartTheme.axis.default }} />
-                  <YAxis tickFormatter={formatPercent} tick={{ fill: chartTheme.axis.default }} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(val) => formatPercent(val)} />
-                  <Legend />
-                  <Bar dataKey="nonVisitRate" name="Non-Visit Rate" fill={chartTheme.status.warn} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </GlassCard>
         ),
       },
@@ -615,16 +635,16 @@ function UnifiedAdminSection() {
               </DataTableFrame>
             </CollapsibleInsightsTable>
 
-            <CollapsibleInsightsTable title="Recent Activity / Drilldown">
+            <CollapsibleInsightsTable title="Recent Logs">
               <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
                 <table className="table-core min-w-full text-sm">
                   <thead>
                     <tr>
-                      <th>Source</th>
                       <th>Date</th>
                       <th>Week</th>
                       <th>Salesperson</th>
                       <th>Team</th>
+                      <th>Sub Team</th>
                       <th>Customer</th>
                       <th>Type</th>
                       <th>Status</th>
@@ -633,11 +653,11 @@ function UnifiedAdminSection() {
                   <tbody>
                     {visitDrilldownRows.map((row, index) => (
                       <tr key={`visit-${row.date}-${row.salesman?.id || index}`}>
-                        <td>Visits</td>
                         <td>{row.date || '-'}</td>
                         <td>{row.isoWeek || '-'}</td>
                         <td>{row.salesman?.name || row.salesman?.email || '-'}</td>
                         <td>{row.salesman?.team || '-'}</td>
+                        <td>{row.salesman?.subTeam || '-'}</td>
                         <td>{row.customerName || '-'}</td>
                         <td>{formatCallType(row.callType)}</td>
                         <td>{row.visited ? 'Visited' : 'Planned only'}</td>
@@ -645,11 +665,11 @@ function UnifiedAdminSection() {
                     ))}
                     {activityDrilldownRows.map((row, index) => (
                       <tr key={`activity-${row.salesperson?.id || index}-${row.date || index}`}>
-                        <td>Compliance</td>
                         <td>{row.date || '-'}</td>
                         <td>{week || '-'}</td>
                         <td>{row.salesperson?.name || '-'}</td>
                         <td>{row.salesperson?.team || '-'}</td>
+                        <td>{row.salesperson?.subTeam || '-'}</td>
                         <td>{row.customerName || '-'}</td>
                         <td>{String(row.type || '-').toUpperCase()}</td>
                         <td>{row.type ? 'Logged' : '-'}</td>
@@ -660,97 +680,6 @@ function UnifiedAdminSection() {
               </DataTableFrame>
             </CollapsibleInsightsTable>
 
-            <CollapsibleInsightsTable title="Salesperson Non-Visit Rates">
-              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-                <table className="table-core min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Salesperson</th>
-                      <th>Planned</th>
-                      <th>Missed</th>
-                      <th>Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stage3SalespersonRates.map((sr) => (
-                      <tr key={sr.id}>
-                        <td>{sr.name}</td>
-                        <td>{sr.plannedVisits}</td>
-                        <td>{sr.nonVisitedCount}</td>
-                        <td className="font-semibold text-warning">{formatPercent(sr.nonVisitRate)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </DataTableFrame>
-            </CollapsibleInsightsTable>
-
-            <CollapsibleInsightsTable
-              title="Repeated Non-Visits (Last 8 Weeks)"
-              trailing={<Badge tone="warning">Threshold: &ge; 2 weeks</Badge>}
-            >
-              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-                <table className="table-core min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Customer</th>
-                      <th>Salesperson</th>
-                      <th>Weeks</th>
-                      <th>Latest Date</th>
-                      <th>Dominant Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stage3TopRepeatedCustomers.map((hist, idx) => (
-                      <tr key={idx}>
-                        <td className="font-semibold">{hist.customerName}</td>
-                        <td>{hist.salesmanName}</td>
-                        <td>{hist.occurrences8w}</td>
-                        <td>{hist.lastNonVisitDate}</td>
-                        <td>{notVisitedReasonCategoryLabel(hist.dominantReasonCategory)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </DataTableFrame>
-            </CollapsibleInsightsTable>
-
-            <CollapsibleInsightsTable title="Detailed Drilldown (Top 100)">
-              <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-                <table className="table-core min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Week</th>
-                      <th>Customer</th>
-                      <th>Salesperson</th>
-                      <th>Category</th>
-                      <th>Reason Text</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stage3DrilldownRows.map((row, idx) => (
-                      <tr key={idx}>
-                        <td>{row.date}</td>
-                        <td>{row.isoWeek}</td>
-                        <td>{row.customerName}</td>
-                        <td>{row.salesmanName}</td>
-                        <td>{notVisitedReasonCategoryLabel(row.category)}</td>
-                        <td className="max-w-xs truncate" title={row.reason}>
-                          {row.reason}
-                        </td>
-                        <td>
-                          <Badge tone={row.visited === 'no' ? 'error' : 'success'}>
-                            {row.visited === 'no' ? 'Not Visited' : row.visited}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </DataTableFrame>
-            </CollapsibleInsightsTable>
           </GlassCard>
         ),
       },
@@ -763,13 +692,12 @@ function UnifiedAdminSection() {
       dataErrors.activityCompliance,
       dataErrors.planActual,
       dataErrors.stage3,
+      dailyTrendRows,
+      monthlyRollupRows,
       planActualData,
       stage3Data,
-      stage3DrilldownRows,
-      stage3SalespersonRates,
-      stage3TopRepeatedCustomers,
-      stage3WeeklyTrend,
       visitDrilldownRows,
+      weeklySummaryRows,
       week,
       chartTheme,
       chartTooltipStyle,

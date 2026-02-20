@@ -1,0 +1,54 @@
+1. Security
+  - No body can just use google sign in and authenticate.
+  - Data backedup over email.
+  - Privilage checking
+      - no salesman should become admin
+  - Data integrity checks
+
+2. Perfomance Improvements
+
+3. Themeing Dashboard
+
+# AddOons - 
+4. Geo Fencing
+5. Whatsapp/email integration
+
+# Pricing
+- Current State (Before Stage 1 from Ninad) :
+    - Market Value:
+        - Static/Landing Page: INR 10K
+        - Basic CRUD App: INR 50K
+    - We have admin roles, visualizations etc.
+        - Dev Fee - INR 80K
+- After Completion of 5 Stages - 
+    - INR 1.3L
+- Deployment
+    - INR 5K/month
+      - Includes Domain Transfer
+      - Credentials Transfer if wanted (One time INR 10K)
+      - 24 Hours resolution if services go down else free deployment for next 2 months.
+- Maintainence
+    - Free critical Bug Fixes if dev's fault (Life Time)
+    - Free Minor UI adjustments, ui position change, color change, improvement. (Life Time)
+    - Free unlimited Maintainence for first 7 days.
+    - INR 10K/month or INR 2,000/hr whenever needed
+    - What isn't included:
+        - New features
+          - new features at INR 2,000/hr
+- Addons
+    - Mobile App For salesman and admin: INR 65K
+    - Export Reports to PDF, XLSX - INR 25K
+    - Daily Data Backup in email (or any other destination) - INR 25K
+    - Perfomance Improvements - INR 25K
+    - Geo Fencing - INR 25K
+    - Codebase buyout - 25K
+    - Power BI - 50K
+    (Taking 3 addons gives 4th free)
+
+
+- Payment Terms
+  - 30% Advance
+  - 40% when dev Completion
+  - 30% after handover
+
+## Uncle admin access
