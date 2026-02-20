@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema(
       default: 'salesman',
       index: true,
     },
+    hierarchy: {
+      type: String,
+      enum: ['mainteam', 'team', 'subteam', 'salesperson'],
+      default: 'salesperson',
+      index: true,
+    },
     mainTeam: {
       type: String,
       default: 'Unassigned',

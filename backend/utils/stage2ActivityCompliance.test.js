@@ -16,10 +16,10 @@ function buildRange() {
 
 function buildUsers() {
   return [
-    { _id: 's1', name: 'Sales 1', email: 's1@example.com', role: 'salesman', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
-    { _id: 's2', name: 'Sales 2', email: 's2@example.com', role: 'salesman', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
-    { _id: 'm1', name: 'Member 1', email: 'm1@example.com', role: 'admin', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
-    { _id: 'm2', name: 'Member 2', email: 'm2@example.com', role: 'admin', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 's1', name: 'Sales 1', email: 's1@example.com', role: 'salesman', hierarchy: 'salesperson', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 's2', name: 'Sales 2', email: 's2@example.com', role: 'salesman', hierarchy: 'salesperson', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 'm1', name: 'Member 1', email: 'm1@example.com', role: 'salesman', hierarchy: 'subteam', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 'm2', name: 'Member 2', email: 'm2@example.com', role: 'salesman', hierarchy: 'subteam', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
   ];
 }
 
@@ -103,4 +103,22 @@ test('contributors are aggregated per member across multiple salespeople', () =>
   assert.equal(member1.contributors.length, 2);
   assert.deepEqual(member1.contributors.map((row) => row.salespersonId), ['s1', 's2']);
   assert.deepEqual(member1.contributors.map((row) => row.jsvCountWithMember), [4, 2]);
+});
+
+test('subteam member cards are built from hierarchy=subteam regardless of role', () => {
+  const users = [
+    { _id: 's1', name: 'Sales 1', email: 's1@example.com', role: 'salesman', hierarchy: 'salesperson', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 'admin1', name: 'Legacy Admin', email: 'legacy-admin@example.com', role: 'admin', hierarchy: 'salesperson', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+    { _id: 'm1', name: 'Subteam Manager', email: 'manager@example.com', role: 'salesman', hierarchy: 'subteam', mainTeam: 'M1', team: 'T1', subTeam: 'ST1' },
+  ];
+
+  const reports = [
+    buildReportForSalesperson('s1', [
+      { date: '2026-01-12', memberId: 'm1' },
+    ]),
+  ];
+
+  const payload = buildStage2Payload({ users, reports, range: buildRange(), filters: {} });
+  assert.equal(payload.subteamMemberCards.length, 1);
+  assert.equal(payload.subteamMemberCards[0].member.id, 'm1');
 });

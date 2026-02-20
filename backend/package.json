@@ -8,7 +8,8 @@
     "dev": "nodemon index.js",
     "test": "node --test",
     "seed:jsv-alerts": "node scripts/seed_jsv_repeat_alerts_for_5_users.js",
-    "backfill:hierarchy": "node scripts/backfill_user_hierarchy.js"
+    "backfill:hierarchy": "node scripts/backfill_user_hierarchy.js",
+    "sync:subteam-hierarchy": "node scripts/sync_subteam_hierarchy_from_requirements.js"
   },
   "keywords": [],
   "author": "",

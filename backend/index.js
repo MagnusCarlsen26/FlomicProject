@@ -159,11 +159,11 @@ async function listJsvEligibleUsersForSalesperson(userId) {
   }
 
   const users = await User.find({
-    role: { $in: ['salesman', 'admin'] },
+    hierarchy: 'subteam',
     subTeam,
     _id: { $ne: currentUser._id },
   })
-    .select('_id name email role subTeam')
+    .select('_id name email role subTeam hierarchy')
     .sort({ name: 1, email: 1 })
     .lean();
 
@@ -173,6 +173,7 @@ async function listJsvEligibleUsersForSalesperson(userId) {
     email: user.email || '',
     role: user.role || 'salesman',
     subTeam: user.subTeam || 'Unassigned',
+    hierarchy: user.hierarchy || 'salesperson',
   }));
 }
 
@@ -1019,7 +1020,7 @@ app.get('/api/admin/stage2-activity-compliance', requireAuth, requireRole('admin
     if (subTeam) userQuery.subTeam = subTeam;
 
     const users = await User.find(userQuery)
-      .select('_id name email mainTeam team subTeam role picture')
+      .select('_id name email mainTeam team subTeam role hierarchy picture')
       .sort({ name: 1, email: 1 })
       .lean();
 

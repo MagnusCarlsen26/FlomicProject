@@ -58,7 +58,7 @@ function buildStage2Payload({ users, reports, range, filters }) {
 
   const subteamMemberCardsMap = new Map();
   users
-    .filter((user) => String(user.role || '').toLowerCase() === 'admin')
+    .filter((user) => String(user.hierarchy || '').toLowerCase() === 'subteam')
     .forEach((user) => {
     const userId = String(user._id);
     subteamMemberCardsMap.set(userId, buildMemberCard(user));
