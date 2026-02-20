@@ -1,54 +1,49 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repo is split into two apps:
-- `backend/`: Express + MongoDB API (`index.js`, `models/`, `middleware/`, `utils/`, `scripts/`).
-- `frontend/`: Vite + React client (`src/pages/`, `src/components/`, `src/context/`, `src/services/`, `src/constants/`).
-- `ENV_SETUP.md`: environment-variable setup for local and Vercel deployments.
+This repository has two JavaScript apps plus test documentation:
+- `backend/`: Express + Mongoose API (`index.js`, `models/`, `middleware/`, `utils/`, `scripts/`).
+- `frontend/`: React + Vite client (`src/pages/`, `src/components/`, `src/context/`, `src/services/`).
+- `test/`: manual test checklists/guides for staged features.
+- `ENV_SETUP.md`: environment setup for local and Vercel deployments.
 
-Keep shared behavior close to where it is used. Backend utility tests live in `backend/utils/*.test.js`.
+Keep backend business logic in `backend/utils/` and UI logic in `frontend/src/` modules close to where it is used.
 
 ## Build, Test, and Development Commands
-Run commands from each app directory.
+Backend (`backend/`):
+- `npm install`: install dependencies.
+- `npm run dev`: run API with nodemon.
+- `npm start`: run API with Node.
+- `npm test`: run unit tests (`node --test`).
 
-- Backend:
-  - `cd backend && npm install`
-  - `npm run dev` to start with `nodemon`.
-  - `npm start` for production-style local run.
-  - `npm test` to run Node test runner (`node --test`).
-- Frontend:
-  - `cd frontend && npm install`
-  - `npm run dev` to start Vite with HMR.
-  - `npm run build` to generate `frontend/dist/`.
-  - `npm run preview` to preview production build.
-  - `npm run lint` to run ESLint.
+Frontend (`frontend/`):
+- `npm install`: install dependencies.
+- `npm run dev`: start Vite dev server.
+- `npm run build`: produce production bundle.
+- `npm run preview`: preview built bundle.
+- `npm run lint`: run ESLint.
 
 ## Coding Style & Naming Conventions
-- Use 2-space indentation in JS/JSX files.
-- Backend uses CommonJS (`require`/`module.exports`); frontend uses ES modules.
-- Naming:
-  - `PascalCase` for React components and Mongoose model files (for example, `WeeklyReport.js`).
-  - `camelCase` for functions/variables (`adminInsights`, `weekKey`).
-  - Hook files start with `use` (for example, `useAuth.jsx`).
-- Follow `frontend/eslint.config.js`; run lint before opening a PR.
+- Use 2-space indentation.
+- Backend uses CommonJS (`require/module.exports`) and semicolons.
+- Frontend uses ES modules and functional React components.
+- Naming: `PascalCase` for components/models, `camelCase` for functions/variables, `useX` for hooks.
+- Follow lint rules in `frontend/eslint.config.js`; avoid unused vars unless intentionally prefixed.
 
 ## Testing Guidelines
-- Backend: write tests with `node:test` + `node:assert/strict`, colocated as `*.test.js` beside utilities.
-- Frontend: no automated tests configured yet; at minimum run `npm run lint` and manually verify changed flows in `npm run dev`.
-- Focus tests on behavior (status transitions, report-row normalization, auth/session logic).
+- Backend tests live beside utils as `*.test.js` and run via `npm test` in `backend/`.
+- Frontend currently relies on lint + manual verification; use `test/` checklists for regression coverage.
+- Before PR: run backend tests, frontend lint, and verify key flows (login, weekly report updates, admin views).
 
 ## Commit & Pull Request Guidelines
-Recent history favors short conventional prefixes (`feat:`, `fix:`, `deploy:`). Prefer:
-- `feat: add admin status filter`
-- `fix: validate planning row payload`
+Git history favors Conventional Commit prefixes (`feat:`, `fix:`). Continue that style with concise, scoped subjects (example: `feat: add stage 3 admin summary endpoint`).
 
-For PRs, include:
-- What changed and why.
-- Linked issue/task (if any).
-- Verification steps run (`backend: npm test`, `frontend: npm run lint`).
-- Screenshots/video for UI changes.
+PRs should include:
+- what changed and why,
+- linked issue/task (if available),
+- test evidence (`backend npm test`, `frontend npm run lint`),
+- screenshots for UI changes,
+- `.env.example` updates for new config.
 
 ## Security & Configuration Tips
-- Never commit `.env` files or secrets; only commit `.env.example`.
-- Update env examples when adding config keys.
-- Review auth/role checks in `backend/middleware/auth.js` for protected routes.
+Never commit secrets. Keep `.env` local and update only `.env.example`. Validate `CORS_ORIGIN`, OAuth, JWT/session cookie, and MongoDB settings per environment using `ENV_SETUP.md`.
