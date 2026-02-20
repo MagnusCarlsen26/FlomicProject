@@ -16,7 +16,13 @@ import GlassCard from '../components/ui/GlassCard'
 import Input from '../components/ui/Input'
 import MultiSelect from '../components/ui/MultiSelect'
 import Select from '../components/ui/Select'
-import { getAdminStage1PlanActual, getAdminStage2ActivityCompliance, getAdminStage3PlannedNotVisited } from '../services/api'
+import {
+  getAdminInsightsPreferences,
+  getAdminStage1PlanActual,
+  getAdminStage2ActivityCompliance,
+  getAdminStage3PlannedNotVisited,
+  updateAdminInsightsPreferences,
+} from '../services/api'
 import {
   DEFAULT_FULL_ROW_SECTION_IDS,
   DEFAULT_LAYOUT,
@@ -34,6 +40,25 @@ import { formatDateTime, formatPercent, getErrorMessage } from './adminUtils'
 const ADMIN_TABLE_FRAME_CLASS = 'max-h-[34rem] overflow-y-auto'
 const INSIGHTS_SECTION_IDS = DEFAULT_LAYOUT
 const STAGE3_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8']
+const SECTION_TITLES = {
+  'visit-performance': 'Visit Performance + Stage 3',
+  'compliance-snapshot': 'Compliance Snapshot',
+  'daily-trend': 'Daily Trend',
+  'stage3-reason-distribution': 'Reason Distribution',
+  'stage3-weekly-trend': 'Weekly Trend (Non-Visit Rate)',
+  'weekly-summary': 'Weekly Summary',
+  'monthly-rollup': 'Monthly Rollup',
+  'top-over-achievers': 'Top Over-Achievers',
+  'top-under-achievers': 'Top Under-Achievers',
+  'call-type-split': 'Call Type Split',
+  'customer-type-split': 'Customer Type Split',
+  'compliance-by-salesperson': 'Compliance by Salesperson',
+  'salesperson-rollup': 'Salesperson Performance Rollup',
+  'recent-activity': 'Recent Activity / Drilldown',
+  'stage3-salesperson-non-visit-rates': 'Salesperson Non-Visit Rates',
+  'stage3-repeated-non-visits': 'Repeated Non-Visits (Last 8 Weeks)',
+  'stage3-detailed-drilldown': 'Detailed Drilldown (Top 100)',
+}
 
 function formatCallType(callType) {
   if (!callType) return 'Unknown'
@@ -115,7 +140,6 @@ function UnifiedAdminSection() {
   const [dataErrors, setDataErrors] = useState({ planActual: null, activityCompliance: null, stage3: null })
   const [lastPolledAt, setLastPolledAt] = useState(null)
 
-  const [query, setQuery] = useState('')
   const [week, setWeek] = useState('')
   const [salesmen, setSalesmen] = useState([])
   const [mainTeam, setMainTeam] = useState('')
@@ -141,7 +165,6 @@ function UnifiedAdminSection() {
       else setIsRefreshing(true)
 
       const stage1Filters = {
-        q: filters.q,
         week: filters.week,
         salesmen: filters.salesmen,
         mainTeam: filters.mainTeam,
@@ -154,7 +177,6 @@ function UnifiedAdminSection() {
         customerType: filters.customerType,
       }
       const stage2Filters = {
-        q: filters.q,
         week: filters.week,
         salesmen: filters.salesmen,
         mainTeam: filters.mainTeam,
@@ -290,7 +312,6 @@ function UnifiedAdminSection() {
 
   const handleApplyFilters = () => {
     const nextFilters = {
-      q: query || undefined,
       week: week || undefined,
       salesmen,
       mainTeam: mainTeam || undefined,
@@ -308,7 +329,6 @@ function UnifiedAdminSection() {
   }
 
   const handleResetFilters = () => {
-    setQuery('')
     setWeek('')
     setSalesmen([])
     setMainTeam('')
@@ -349,14 +369,18 @@ function UnifiedAdminSection() {
         render: () => (
           <GlassCard className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance</h2>
-              <DataWarning message={dataErrors.planActual} />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Visit Performance + Stage 3</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <DataWarning message={dataErrors.planActual} />
+                <DataWarning message={dataErrors.stage3} />
+              </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <InsightCard title="Planned Visits" value={String(planActualData?.totals?.plannedVisits || 0)} />
               <InsightCard title="Actual Visits" value={String(planActualData?.totals?.actualVisits || 0)} />
-              <InsightCard title="Variance" value={String(planActualData?.totals?.variance || 0)} />
               <InsightCard title="Achievement" value={formatPercent(planActualData?.totals?.achievementRate || 0)} />
+              <InsightCard title="Missed Visits" value={String(stage3Data?.totals?.plannedButNotVisitedCount || 0)} />
+              <InsightCard title="Non-Visit Rate" value={formatPercent(stage3Data?.totals?.nonVisitRate || 0)} />
             </div>
           </GlassCard>
         ),
@@ -536,53 +560,6 @@ function UnifiedAdminSection() {
         ),
       },
       {
-        id: 'admin-monitoring',
-        render: () => (
-          <GlassCard className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Admin Monitoring</h2>
-            <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-              <table className="table-core min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Admin</th>
-                    <th>Total JSV</th>
-                    <th>Status</th>
-                    <th>Top Contributor</th>
-                    <th>Alerts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(activityData?.adminCards || []).map((card) => {
-                    const top = [...card.salespersonBreakdown].sort((a, b) => b.sharePct - a.sharePct)[0]
-                    return (
-                      <tr key={card.admin.id}>
-                        <td>{card.admin.name}</td>
-                        <td>{card.jsvCount}</td>
-                        <td>
-                          <StatusChip
-                            severity={
-                              card.alerts.find((a) => a.severity === 'critical')
-                                ? 'critical'
-                                : card.alerts.length > 0
-                                  ? 'warning'
-                                  : 'compliant'
-                            }
-                          />
-                        </td>
-                        <td>{top ? `${top.name} (${Math.round(top.sharePct * 100)}%)` : '-'}</td>
-                        <td>
-                          <AlertList alerts={card.alerts} />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
         id: 'recent-activity',
         render: () => (
           <GlassCard className="space-y-3">
@@ -629,22 +606,6 @@ function UnifiedAdminSection() {
                 </tbody>
               </table>
             </DataTableFrame>
-          </GlassCard>
-        ),
-      },
-      {
-        id: 'stage3-summary',
-        render: () => (
-          <GlassCard className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Stage 3 Summary</h2>
-              <DataWarning message={dataErrors.stage3} />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <InsightCard title="Stage 3 Planned Visits" value={String(stage3Data?.totals?.plannedVisits || 0)} />
-              <InsightCard title="Missed Visits" value={String(stage3Data?.totals?.plannedButNotVisitedCount || 0)} />
-              <InsightCard title="Non-Visit Rate" value={formatPercent(stage3Data?.totals?.nonVisitRate || 0)} />
-            </div>
           </GlassCard>
         ),
       },
@@ -835,7 +796,9 @@ function UnifiedAdminSection() {
   )
   const [sectionOrder, setSectionOrder] = useState(DEFAULT_LAYOUT)
   const [fullRowSectionIds, setFullRowSectionIds] = useState([])
+  const [collapsedSectionIds, setCollapsedSectionIds] = useState(INSIGHTS_SECTION_IDS)
   const [isFullRowHydrated, setIsFullRowHydrated] = useState(false)
+  const [isCollapsedHydrated, setIsCollapsedHydrated] = useState(false)
   const userStorageIdentity = user?.id || user?.email || null
 
   useEffect(() => {
@@ -877,6 +840,51 @@ function UnifiedAdminSection() {
     saveFullRowSections(fullRowStorageKey, normalized)
   }, [fullRowSectionIds, fullRowStorageKey, isFullRowHydrated])
 
+  useEffect(() => {
+    let isMounted = true
+
+    const loadCollapsedSections = async () => {
+      setCollapsedSectionIds(INSIGHTS_SECTION_IDS)
+      setIsCollapsedHydrated(false)
+
+      try {
+        const response = await getAdminInsightsPreferences()
+        if (!isMounted) return
+        const serverCollapsed = response?.collapsedSectionIds
+        const normalized = Array.isArray(serverCollapsed)
+          ? INSIGHTS_SECTION_IDS.filter((id) => serverCollapsed.includes(id))
+          : INSIGHTS_SECTION_IDS
+        setCollapsedSectionIds(normalized)
+      } catch {
+        if (!isMounted) return
+        setCollapsedSectionIds(INSIGHTS_SECTION_IDS)
+      } finally {
+        if (isMounted) setIsCollapsedHydrated(true)
+      }
+    }
+
+    loadCollapsedSections()
+
+    return () => {
+      isMounted = false
+    }
+  }, [userStorageIdentity])
+
+  useEffect(() => {
+    if (!isCollapsedHydrated) return
+
+    const normalized = INSIGHTS_SECTION_IDS.filter((id) => collapsedSectionIds.includes(id))
+    const shouldRewrite = normalized.length !== collapsedSectionIds.length
+    if (shouldRewrite) {
+      setCollapsedSectionIds(normalized)
+      return
+    }
+
+    updateAdminInsightsPreferences({ collapsedSectionIds: normalized }).catch(() => {
+      // Best-effort persistence only.
+    })
+  }, [collapsedSectionIds, isCollapsedHydrated])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -912,6 +920,12 @@ function UnifiedAdminSection() {
     )
   }
 
+  const handleToggleCollapsed = (sectionId) => {
+    setCollapsedSectionIds((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
+    )
+  }
+
   return (
     <div className="space-y-4">
       <GlassCard className="space-y-4">
@@ -929,21 +943,8 @@ function UnifiedAdminSection() {
 
         <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface/50 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Search</label>
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name or email" />
-          </div>
-          <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Week</label>
             <Input type="week" value={week} onChange={(e) => setWeek(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Salespeople</label>
-            <MultiSelect
-              options={filteredSalesmenOptions}
-              selected={salesmen}
-              onChange={setSalesmen}
-              placeholder="All salespeople"
-            />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Main Team</label>
@@ -998,6 +999,15 @@ function UnifiedAdminSection() {
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Salespeople</label>
+            <MultiSelect
+              options={filteredSalesmenOptions}
+              selected={salesmen}
+              onChange={setSalesmen}
+              placeholder="All salespeople"
+            />
           </div>
         </div>
 
@@ -1068,8 +1078,11 @@ function UnifiedAdminSection() {
                   key={sectionId}
                   id={sectionId}
                   className={fullRowSectionIds.includes(sectionId) ? 'h-full xl:col-span-2' : 'h-full'}
+                  collapsedLabel={SECTION_TITLES[sectionId] || sectionId}
                   isFullRow={fullRowSectionIds.includes(sectionId)}
+                  isCollapsed={collapsedSectionIds.includes(sectionId)}
                   onToggleFullRow={handleToggleFullRow}
+                  onToggleCollapsed={handleToggleCollapsed}
                 >
                   {section.render()}
                 </DraggableSection>
@@ -1086,12 +1099,6 @@ export default function AdminPage() {
   return (
     <PageEnter>
       <PageSurface>
-        <GlassCard className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Admin</p>
-          <h1 className="text-2xl font-bold text-text-primary">Operations Hub</h1>
-          <p className="text-sm text-text-secondary">Unified dashboard for performance, productivity, and compliance tracking.</p>
-        </GlassCard>
-
         <UnifiedAdminSection />
       </PageSurface>
     </PageEnter>

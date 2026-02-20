@@ -49,6 +49,14 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    preferences: {
+      adminInsights: {
+        collapsedSectionIds: {
+          type: [String],
+          default: undefined,
+        },
+      },
+    },
   },
   {
     timestamps: true,

@@ -318,4 +318,15 @@ export async function getAdminStage3PlannedNotVisited({
   return apiFetch(`/api/admin/stage3-planned-not-visited${suffix}`)
 }
 
+export async function getAdminInsightsPreferences() {
+  return apiFetch('/api/admin/insights/preferences')
+}
+
+export async function updateAdminInsightsPreferences({ collapsedSectionIds }) {
+  return apiFetch('/api/admin/insights/preferences', {
+    method: 'PUT',
+    body: JSON.stringify({ collapsedSectionIds }),
+  })
+}
+
 export { ApiError }

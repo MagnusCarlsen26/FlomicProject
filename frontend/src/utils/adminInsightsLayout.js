@@ -4,7 +4,6 @@ export const FULL_ROW_STORAGE_PREFIX = 'flomic.admin.insights.fullrow.v1'
 export const DEFAULT_LAYOUT = [
   'visit-performance',
   'compliance-snapshot',
-  'stage3-summary',
   'daily-trend',
   'stage3-reason-distribution',
   'stage3-weekly-trend',
@@ -15,7 +14,6 @@ export const DEFAULT_LAYOUT = [
   'call-type-split',
   'customer-type-split',
   'compliance-by-salesperson',
-  'admin-monitoring',
   'salesperson-rollup',
   'recent-activity',
   'stage3-salesperson-non-visit-rates',

@@ -33,6 +33,27 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client();
+const ADMIN_INSIGHTS_SECTION_IDS = [
+  'visit-performance',
+  'compliance-snapshot',
+  'stage3-summary',
+  'daily-trend',
+  'stage3-reason-distribution',
+  'stage3-weekly-trend',
+  'weekly-summary',
+  'monthly-rollup',
+  'top-over-achievers',
+  'top-under-achievers',
+  'call-type-split',
+  'customer-type-split',
+  'compliance-by-salesperson',
+  'admin-monitoring',
+  'salesperson-rollup',
+  'recent-activity',
+  'stage3-salesperson-non-visit-rates',
+  'stage3-repeated-non-visits',
+  'stage3-detailed-drilldown',
+];
 
 function normalizeOrigin(value) {
   if (typeof value !== 'string') {
@@ -103,6 +124,27 @@ function buildSafeUser(user, options = {}) {
 
 function hasDbConnection() {
   return mongoose.connection?.readyState === 1;
+}
+
+function normalizeCollapsedSectionIds(sectionIds = []) {
+  if (!Array.isArray(sectionIds)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const sectionId of sectionIds) {
+    if (typeof sectionId !== 'string') {
+      continue;
+    }
+    const trimmed = sectionId.trim();
+    if (!ADMIN_INSIGHTS_SECTION_IDS.includes(trimmed) || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    normalized.push(trimmed);
+  }
+  return normalized;
 }
 
 async function listAdminUsers() {
@@ -732,6 +774,56 @@ app.get('/api/admin/salesmen', requireAuth, requireRole('admin'), async (req, re
   } catch (error) {
     console.error('Fetch salesmen error:', error);
     return res.status(500).json({ message: 'Unable to fetch salesmen' });
+  }
+});
+
+app.get('/api/admin/insights/preferences', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  try {
+    const user = await User.findById(req.auth.userId).select('preferences.adminInsights.collapsedSectionIds').lean();
+    if (!user) {
+      clearSessionCookie(res);
+      return res.status(401).json({ message: 'Session user not found' });
+    }
+
+    const rawCollapsedSectionIds = user?.preferences?.adminInsights?.collapsedSectionIds;
+    const collapsedSectionIds = Array.isArray(rawCollapsedSectionIds)
+      ? normalizeCollapsedSectionIds(rawCollapsedSectionIds)
+      : null;
+    return res.status(200).json({ collapsedSectionIds });
+  } catch (error) {
+    console.error('Admin insights preferences fetch error:', error);
+    return res.status(500).json({ message: 'Unable to fetch admin insights preferences' });
+  }
+});
+
+app.put('/api/admin/insights/preferences', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!hasDbConnection()) {
+    return res.status(503).json({ message: 'Database is not connected' });
+  }
+
+  const collapsedSectionIds = normalizeCollapsedSectionIds(req.body?.collapsedSectionIds || []);
+
+  try {
+    const user = await User.findById(req.auth.userId).select('preferences');
+    if (!user) {
+      clearSessionCookie(res);
+      return res.status(401).json({ message: 'Session user not found' });
+    }
+
+    user.preferences = user.preferences || {};
+    user.preferences.adminInsights = user.preferences.adminInsights || {};
+    user.preferences.adminInsights.collapsedSectionIds = collapsedSectionIds;
+    user.markModified('preferences');
+    await user.save();
+
+    return res.status(200).json({ collapsedSectionIds });
+  } catch (error) {
+    console.error('Admin insights preferences update error:', error);
+    return res.status(500).json({ message: 'Unable to save admin insights preferences' });
   }
 });
 

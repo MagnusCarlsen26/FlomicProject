@@ -83,6 +83,7 @@ function ActualOutputRowsTable({ rows }) {
 }
 
 export default function AdminSalesmenStatusPage() {
+  const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -91,6 +92,8 @@ export default function AdminSalesmenStatusPage() {
   const [total, setTotal] = useState(0)
   const [weekInfo, setWeekInfo] = useState(null)
   const [lastPolledAt, setLastPolledAt] = useState(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[1])
   const fetchCounterRef = useRef(0)
 
   const fetchStatus = useCallback(
@@ -140,6 +143,16 @@ export default function AdminSalesmenStatusPage() {
     fetchStatus()
   }, [fetchStatus])
 
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
+  const clampedPage = Math.min(page, totalPages)
+  const paginatedEntries = entries.slice((clampedPage - 1) * pageSize, clampedPage * pageSize)
+  const rangeStart = entries.length === 0 ? 0 : (clampedPage - 1) * pageSize + 1
+  const rangeEnd = entries.length === 0 ? 0 : Math.min(clampedPage * pageSize, entries.length)
+
+  useEffect(() => {
+    setPage(1)
+  }, [entries.length, pageSize])
+
   return (
     <PageEnter>
       <PageSurface>
@@ -158,7 +171,9 @@ export default function AdminSalesmenStatusPage() {
             </Button>
           </div>
 
-          <p className="mt-3 text-sm text-text-secondary">Showing {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}</p>
+          <p className="mt-3 text-sm text-text-secondary">
+            Showing {rangeStart}-{rangeEnd} of {total} salesmen. Last refresh: {formatDateTime(lastPolledAt)}
+          </p>
 
           <div className="mt-4 space-y-3">
             {error ? <Alert tone="error">{error}</Alert> : null}
@@ -175,7 +190,7 @@ export default function AdminSalesmenStatusPage() {
             </GlassCard>
           ) : null}
 
-          {entries.map((entry) => (
+          {paginatedEntries.map((entry) => (
             <details
               key={entry.salesman.id}
               className="rounded-3xl border border-border bg-surface p-4 shadow-soft open:ring-1 open:ring-primary/40"
@@ -218,6 +233,47 @@ export default function AdminSalesmenStatusPage() {
             </details>
           ))}
         </section>
+
+        {!loading && entries.length > 0 ? (
+          <GlassCard>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-text-secondary">
+                Page {clampedPage} of {totalPages}
+              </p>
+
+              <div className="flex items-center gap-2">
+                <label htmlFor="page-size" className="text-sm text-text-secondary">
+                  Per page
+                </label>
+                <select
+                  id="page-size"
+                  className="rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text-primary"
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" disabled={clampedPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={clampedPage >= totalPages}
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </GlassCard>
+        ) : null}
 
         {weekInfo ? (
           <p className="text-xs text-text-muted">Detail table week: {weekInfo.startDate} to {weekInfo.endDate}</p>
