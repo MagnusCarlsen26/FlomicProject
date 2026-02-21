@@ -442,20 +442,6 @@ function UnifiedAdminSection() {
       JSON.stringify(row || {}).toLowerCase().includes(normalizedMoreInsightsSearch),
     )
   }, [activityDrilldownRows, normalizedMoreInsightsSearch])
-  const filteredEnquiryBySalespersonRows = useMemo(() => {
-    const rows = planActualData?.enquiryKpis?.bySalesperson || []
-    if (!normalizedMoreInsightsSearch) return rows
-    return rows.filter((row) =>
-      JSON.stringify(row || {}).toLowerCase().includes(normalizedMoreInsightsSearch),
-    )
-  }, [normalizedMoreInsightsSearch, planActualData])
-  const filteredEnquiryByHodRows = useMemo(() => {
-    const rows = planActualData?.enquiryKpis?.byMainTeam || []
-    if (!normalizedMoreInsightsSearch) return rows
-    return rows.filter((row) =>
-      JSON.stringify(row || {}).toLowerCase().includes(normalizedMoreInsightsSearch),
-    )
-  }, [normalizedMoreInsightsSearch, planActualData])
   const dailyTrendRows = useMemo(
     () => (planActualData?.dailyTrend || []).map((row) => ({ ...row, dateLabel: formatMonthDayLabel(row.date) })),
     [planActualData],
@@ -656,74 +642,6 @@ function UnifiedAdminSection() {
                   variant="success"
                 />
               </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-text-muted">By Salesperson</h4>
-                  <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-                    <table className="table-core min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th>Salesperson</th>
-                          <th>Main Team</th>
-                          <th>Actual Visits</th>
-                          <th>Enquiries</th>
-                          <th>Ratio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredEnquiryBySalespersonRows.map((row) => (
-                          <tr key={row.id}>
-                            <td>{row.name || row.email}</td>
-                            <td>{row.mainTeam || '-'}</td>
-                            <td>{row.actualVisits}</td>
-                            <td>{row.enquiriesGenerated}</td>
-                            <td>{formatRatio(row.enquiryGenerationRatio)}</td>
-                          </tr>
-                        ))}
-                        {!filteredEnquiryBySalespersonRows.length ? (
-                          <tr>
-                            <td colSpan={5} className="py-4 text-center text-text-secondary">
-                              No matching rows found.
-                            </td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </DataTableFrame>
-                </div>
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-text-muted">By HOD (Main Team)</h4>
-                  <DataTableFrame className={ADMIN_TABLE_FRAME_CLASS}>
-                    <table className="table-core min-w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th>HOD</th>
-                          <th>Actual Visits</th>
-                          <th>Enquiries</th>
-                          <th>Ratio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredEnquiryByHodRows.map((row) => (
-                          <tr key={row.label}>
-                            <td>{row.label || '-'}</td>
-                            <td>{row.actualVisits}</td>
-                            <td>{row.enquiriesGenerated}</td>
-                            <td>{formatRatio(row.enquiryGenerationRatio)}</td>
-                          </tr>
-                        ))}
-                        {!filteredEnquiryByHodRows.length ? (
-                          <tr>
-                            <td colSpan={4} className="py-4 text-center text-text-secondary">
-                              No matching rows found.
-                            </td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </DataTableFrame>
-                </div>
-              </div>
             </div>
           </GlassCard>
         ),
@@ -849,8 +767,6 @@ function UnifiedAdminSection() {
       moreInsightsSearch,
       planActualData,
       stage3Data,
-      filteredEnquiryBySalespersonRows,
-      filteredEnquiryByHodRows,
       filteredSalespersonRollupRows,
       filteredVisitDrilldownRows,
       filteredActivityDrilldownRows,
