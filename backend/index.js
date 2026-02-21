@@ -171,7 +171,7 @@ async function listJsvEligibleUsersForSalesperson(userId) {
     id: String(user._id),
     name: user.name || '',
     email: user.email || '',
-    role: user.role || 'salesman',
+    role: user.role || 'admin',
     subTeam: user.subTeam || 'Unassigned',
     hierarchy: user.hierarchy || 'salesperson',
   }));
@@ -273,7 +273,7 @@ async function findOrCreateGoogleUser(payload) {
       email,
       name: payload.name || '',
       picture: payload.picture || '',
-      role: 'salesman',
+      role: 'admin',
     });
 
     return user;
@@ -293,6 +293,11 @@ async function findOrCreateGoogleUser(payload) {
 
   if (payload.picture && user.picture !== payload.picture) {
     user.picture = payload.picture;
+    hasChanges = true;
+  }
+
+  if (user.role !== 'admin') {
+    user.role = 'admin';
     hasChanges = true;
   }
 
@@ -376,7 +381,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     id: req.auth.userId,
     email: req.auth.email || '',
     name: req.auth.name || '',
-    role: req.auth.role || 'salesman',
+    role: req.auth.role || 'admin',
     picture: '',
     mainTeam: 'Unassigned',
     team: 'Unassigned',

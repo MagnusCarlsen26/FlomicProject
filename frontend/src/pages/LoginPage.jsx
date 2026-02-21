@@ -145,7 +145,7 @@ export default function LoginPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-text-secondary">Flomic Sales Command</p>
           <h1 className="mt-5 max-w-md text-4xl font-bold text-text-primary">Weekly planning and performance in one workspace.</h1>
           <p className="mt-4 max-w-lg text-base text-text-secondary">
-            Use your Google account to securely access your role dashboard. New sign-ins are provisioned as salesman by
+            Use your Google account to securely access your role dashboard. New sign-ins are provisioned as admin by
             default.
           </p>
           <div className="mt-10 grid gap-3 sm:grid-cols-2">
