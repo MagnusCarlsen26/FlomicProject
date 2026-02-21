@@ -3,22 +3,23 @@ export const FULL_ROW_STORAGE_PREFIX = 'flomic.admin.insights.fullrow.v1'
 
 export const DEFAULT_LAYOUT = [
   'visit-performance',
+  'enquiry-kpis',
   'compliance-snapshot',
   'daily-trend',
   'stage3-reason-distribution',
-  'weekly-monthly-summary',
   'top-achievers-summary',
+  'weekly-monthly-summary',
   'call-type-split',
   'customer-type-split',
   'compliance-by-salesperson',
-  'enquiry-kpis',
   'more-insights',
 ]
 
 export const DEFAULT_FULL_ROW_SECTION_IDS = [
-  'daily-trend',
   'visit-performance',
   'more-insights',
+  'compliance-by-salesperson',
+  'weekly-monthly-summary',
 ]
 
 export function getLayoutStorageKey(userId) {
