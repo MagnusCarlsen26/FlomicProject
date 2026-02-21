@@ -54,9 +54,9 @@ test('buildStage1Payload computes totals, hierarchy and unknown call type', () =
         { date: '2026-02-11', customerName: 'C', contactType: 'jsv', customerType: 'existing' },
       ],
       actualOutputRows: [
-        { date: '2026-02-09', visited: 'yes' },
-        { date: '2026-02-10', visited: 'no' },
-        { date: '2026-02-11', visited: 'yes' },
+        { date: '2026-02-09', visited: 'yes', enquiriesReceived: 3 },
+        { date: '2026-02-10', visited: 'no', enquiriesReceived: 2 },
+        { date: '2026-02-11', visited: 'yes', enquiriesReceived: 1 },
       ],
     },
     {
@@ -67,9 +67,9 @@ test('buildStage1Payload computes totals, hierarchy and unknown call type', () =
         { date: '2026-02-14', customerName: 'F', contactType: 'fc', customerType: 'existing' },
       ],
       actualOutputRows: [
-        { date: '2026-02-12', visited: 'yes' },
-        { date: '2026-02-13', visited: 'yes' },
-        { date: '2026-02-14', visited: 'no' },
+        { date: '2026-02-12', visited: 'yes', enquiriesReceived: 2 },
+        { date: '2026-02-13', visited: 'yes', enquiriesReceived: 4 },
+        { date: '2026-02-14', visited: 'no', enquiriesReceived: 5 },
       ],
     },
   ];
@@ -103,6 +103,14 @@ test('buildStage1Payload computes totals, hierarchy and unknown call type', () =
   const unknownType = payload.breakdowns.callType.find((row) => row.callType === 'unknown');
   assert.equal(unknownType.plannedVisits, 1);
   assert.equal(unknownType.actualVisits, 0);
+  assert.equal(payload.enquiryKpis.enquiriesGeneratedFromVisits, 10);
+  assert.equal(payload.enquiryKpis.visitToEnquiryConversionRatio, 2.5);
+  assert.equal(payload.enquiryKpis.bySalesperson.length, 2);
+  assert.equal(payload.enquiryKpis.byMainTeam.length, 1);
+  const alphaEnquiry = payload.enquiryKpis.bySalesperson.find((row) => row.id === 'u1');
+  assert.equal(alphaEnquiry.enquiriesGenerated, 4);
+  assert.equal(alphaEnquiry.actualVisits, 2);
+  assert.equal(alphaEnquiry.enquiryGenerationRatio, 2);
 });
 
 test('buildStage1Payload ranks achievers with minimum planned threshold', () => {

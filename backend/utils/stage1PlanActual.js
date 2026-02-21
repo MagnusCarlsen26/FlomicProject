@@ -196,7 +196,10 @@ function buildActualByDate(actualRows) {
     if (!date) {
       continue;
     }
-    map.set(date, String(row?.visited || '').trim().toLowerCase() === 'yes');
+    map.set(date, {
+      visited: String(row?.visited || '').trim().toLowerCase() === 'yes',
+      enquiriesReceived: normalizeInteger(row?.enquiriesReceived),
+    });
   }
   return map;
 }
@@ -221,6 +224,28 @@ function addCount(target, visited) {
   if (visited) {
     target.actualVisits += 1;
   }
+}
+
+function normalizeInteger(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.floor(parsed);
+}
+
+function buildEnquiryAccumulator() {
+  return { actualVisits: 0, enquiriesGenerated: 0 };
+}
+
+function finalizeEnquiryMetrics(metrics) {
+  const actualVisits = metrics.actualVisits || 0;
+  const enquiriesGenerated = metrics.enquiriesGenerated || 0;
+  return {
+    actualVisits,
+    enquiriesGenerated,
+    enquiryGenerationRatio: roundNumber(safeDivide(enquiriesGenerated, actualVisits)),
+  };
 }
 
 function buildStage1Payload({ users, reports, range, filters }) {
@@ -306,7 +331,10 @@ function buildStage1Payload({ users, reports, range, filters }) {
   const mainTeamRollup = new Map();
   const teamRollup = new Map();
   const subTeamRollup = new Map();
+  const salespersonEnquiryRollup = new Map();
+  const mainTeamEnquiryRollup = new Map();
   const drilldownRows = [];
+  let enquiriesGeneratedFromVisits = 0;
 
   for (const report of reports || []) {
     const salesmanId = String(report.salesmanId);
@@ -353,7 +381,8 @@ function buildStage1Payload({ users, reports, range, filters }) {
         continue;
       }
 
-      const isVisited = actualByDate.get(dateKey) === true;
+      const actualRow = actualByDate.get(dateKey) || { visited: false, enquiriesReceived: 0 };
+      const isVisited = actualRow.visited === true;
       const isoWeek = getIsoWeekString(dateFromKey(dateKey));
       const monthKey = dateKey.slice(0, 7);
 
@@ -400,6 +429,29 @@ function buildStage1Payload({ users, reports, range, filters }) {
       addCount(teamRollup.get(user.team), isVisited);
       addCount(subTeamRollup.get(user.subTeam), isVisited);
 
+      if (!salespersonEnquiryRollup.has(user.id)) {
+        salespersonEnquiryRollup.set(user.id, {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          mainTeam: user.mainTeam,
+          team: user.team,
+          subTeam: user.subTeam,
+          ...buildEnquiryAccumulator(),
+        });
+      }
+      if (!mainTeamEnquiryRollup.has(user.mainTeam)) {
+        mainTeamEnquiryRollup.set(user.mainTeam, { label: user.mainTeam, ...buildEnquiryAccumulator() });
+      }
+      if (isVisited) {
+        const enquiriesForRow = normalizeInteger(actualRow.enquiriesReceived);
+        enquiriesGeneratedFromVisits += enquiriesForRow;
+        salespersonEnquiryRollup.get(user.id).actualVisits += 1;
+        salespersonEnquiryRollup.get(user.id).enquiriesGenerated += enquiriesForRow;
+        mainTeamEnquiryRollup.get(user.mainTeam).actualVisits += 1;
+        mainTeamEnquiryRollup.get(user.mainTeam).enquiriesGenerated += enquiriesForRow;
+      }
+
       drilldownRows.push({
         date: dateKey,
         isoWeek,
@@ -409,6 +461,7 @@ function buildStage1Payload({ users, reports, range, filters }) {
         visited: isVisited,
         customerName: String(planningRow.customerName || '').trim(),
         locationArea: String(planningRow.locationArea || '').trim(),
+        enquiriesReceived: normalizeInteger(actualRow.enquiriesReceived),
         salesman: {
           id: user.id,
           name: user.name,
@@ -457,6 +510,37 @@ function buildStage1Payload({ users, reports, range, filters }) {
       subTeam: filterSubTeam || null,
     },
     totals: finalizeMetrics(totals),
+    enquiryKpis: {
+      enquiriesGeneratedFromVisits,
+      visitToEnquiryConversionRatio: roundNumber(safeDivide(enquiriesGeneratedFromVisits, totals.actualVisits)),
+      bySalesperson: Array.from(salespersonEnquiryRollup.values())
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          mainTeam: row.mainTeam,
+          team: row.team,
+          subTeam: row.subTeam,
+          ...finalizeEnquiryMetrics(row),
+        }))
+        .sort((a, b) => {
+          if (b.enquiriesGenerated !== a.enquiriesGenerated) {
+            return b.enquiriesGenerated - a.enquiriesGenerated;
+          }
+          return b.actualVisits - a.actualVisits;
+        }),
+      byMainTeam: Array.from(mainTeamEnquiryRollup.values())
+        .map((row) => ({
+          label: row.label,
+          ...finalizeEnquiryMetrics(row),
+        }))
+        .sort((a, b) => {
+          if (b.enquiriesGenerated !== a.enquiriesGenerated) {
+            return b.enquiriesGenerated - a.enquiriesGenerated;
+          }
+          return b.actualVisits - a.actualVisits;
+        }),
+    },
     dailyTrend: Array.from(daily.entries())
       .map(([date, metric]) => ({ date, ...finalizeMetrics(metric) }))
       .sort((a, b) => a.date.localeCompare(b.date)),

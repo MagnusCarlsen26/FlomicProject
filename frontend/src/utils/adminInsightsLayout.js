@@ -11,6 +11,7 @@ export const DEFAULT_LAYOUT = [
   'call-type-split',
   'customer-type-split',
   'compliance-by-salesperson',
+  'enquiry-kpis',
   'more-insights',
 ]
 
